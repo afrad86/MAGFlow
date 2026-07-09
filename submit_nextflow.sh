@@ -22,6 +22,7 @@ echo "=================================================="
 
 ~/software/nextflow run main.nf \
     -profile farm22 \
+    -resume \
     "$@" \
     -with-report logs/report.html \
     -with-trace logs/trace.txt \
