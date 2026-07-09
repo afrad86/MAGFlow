@@ -1,0 +1,161 @@
+nextflow.enable.dsl=2
+
+include { PREPROCESSING } from './subworkflows/preprocessing/main'
+
+workflow {
+
+    /*
+     * =========================================================================
+     * Allowed longitudinal visits
+     * =========================================================================
+     */
+    def VALID_VISITS = ['D1', 'M1', 'M2', 'M4', 'M6']
+
+    /*
+     * =========================================================================
+     * Validate Bowtie2 reference index
+     * =========================================================================
+     */
+    def host_reference_files = [
+        "${params.reference_host}.1.bt2",
+        "${params.reference_host}.2.bt2",
+        "${params.reference_host}.3.bt2",
+        "${params.reference_host}.4.bt2",
+        "${params.reference_host}.rev.1.bt2",
+        "${params.reference_host}.rev.2.bt2"
+    ]
+
+    host_reference_files.each { reference_file ->
+
+        if (!file(reference_file).exists()) {
+
+            error """
+Bowtie2 reference index not found.
+
+Missing file:
+
+${reference_file}
+
+Please verify:
+
+- conf/references.config
+- params.reference_host
+- All six Bowtie2 index files are present
+"""
+
+        }
+
+    }
+
+    /*
+     * =========================================================================
+     * Read and validate metadata
+     * =========================================================================
+     */
+    samples_ch = Channel
+        .fromPath(params.metadata)
+        .splitCsv(header: true)
+        .map { row ->
+
+            /*
+             * Clean metadata
+             */
+            row.sample = row.sample.trim()
+            row.participant_id = row.participant_id.trim()
+            row.visit = row.visit.trim().toUpperCase()
+
+            /*
+             * Validate required metadata
+             */
+            assert row.sample :
+                "Metadata error: 'sample' is empty."
+
+            assert row.participant_id :
+                "Metadata error: 'participant_id' is empty for sample '${row.sample}'."
+
+            assert row.visit :
+                "Metadata error: 'visit' is empty for sample '${row.sample}'."
+
+            /*
+             * Validate visit
+             */
+            if (!(row.visit in VALID_VISITS)) {
+
+                error """
+Invalid visit '${row.visit}' for sample '${row.sample}'.
+
+Allowed visit values are:
+
+    D1
+    M1
+    M2
+    M4
+    M6
+"""
+
+            }
+
+            /*
+             * Locate FASTQ files
+             */
+            def reads_r1 = file("${params.fastq_dir}/${row.sample}_1.fastq.gz")
+            def reads_r2 = file("${params.fastq_dir}/${row.sample}_2.fastq.gz")
+
+            /*
+             * Validate FASTQ files
+             */
+            if (!reads_r1.exists()) {
+
+                error """
+Missing FASTQ file:
+
+${reads_r1}
+
+Please verify:
+
+- sample ID in input/metadata.csv
+- FASTQ filename
+- params.fastq_dir in nextflow.config
+"""
+
+            }
+
+            if (!reads_r2.exists()) {
+
+                error """
+Missing FASTQ file:
+
+${reads_r2}
+
+Please verify:
+
+- sample ID in input/metadata.csv
+- FASTQ filename
+- params.fastq_dir in nextflow.config
+"""
+
+            }
+
+            /*
+             * Standard MAGFlow sample tuple
+             *
+             * (sample, participant_id, visit, reads_r1, reads_r2)
+             */
+            tuple(
+                row.sample,
+                row.participant_id,
+                row.visit,
+                reads_r1,
+                reads_r2
+            )
+
+        }
+
+    /*
+     * =========================================================================
+     * Run preprocessing workflow
+     * =========================================================================
+     */
+    preprocessing_out = PREPROCESSING(samples_ch)
+
+}
