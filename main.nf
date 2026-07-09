@@ -1,6 +1,7 @@
 nextflow.enable.dsl=2
 
 include { PREPROCESSING } from './subworkflows/preprocessing/main'
+include { ASSEMBLY }      from './subworkflows/assembly/main'
 
 workflow {
 
@@ -10,6 +11,15 @@ workflow {
      * =========================================================================
      */
     def VALID_VISITS = ['D1', 'M1', 'M2', 'M4', 'M6']
+    
+    /*
+     * =========================================================================
+     * Supported assemblers
+     * =========================================================================
+     */
+    def VALID_ASSEMBLERS = [
+        'metaspades'
+    ]
 
     /*
      * =========================================================================
@@ -47,6 +57,30 @@ Please verify:
 
     }
 
+    /*
+     * =========================================================================
+     * Validate assembler
+     * =========================================================================
+     */
+
+    if (!(params.assembler in VALID_ASSEMBLERS)) {
+
+        error """
+Unsupported assembler:
+
+    ${params.assembler}
+
+Supported assemblers:
+
+${VALID_ASSEMBLERS.collect { "    - ${it}" }.join('\n')}
+
+Please update:
+
+    - nextflow.config
+"""
+
+    }
+    
     /*
      * =========================================================================
      * Read and validate metadata
@@ -157,5 +191,7 @@ Please verify:
      * =========================================================================
      */
     preprocessing_out = PREPROCESSING(samples_ch)
+
+    assembly_out = ASSEMBLY(preprocessing_out.reads)
 
 }
