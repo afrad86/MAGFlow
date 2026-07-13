@@ -2,24 +2,20 @@ process METASPADES {
 
     tag "${sample}"
 
-    publishDir "${params.outdir}/03_assembly/contigs", \
-        mode: 'copy', \
+    publishDir "${params.outdir}/03_assembly/contigs",
+        mode: 'copy',
         pattern: "*.contigs.fasta"
 
-    publishDir "${params.outdir}/03_assembly/scaffolds", \
-        mode: 'copy', \
+    publishDir "${params.outdir}/03_assembly/scaffolds",
+        mode: 'copy',
         pattern: "*.scaffolds.fasta"
 
-    publishDir "${params.outdir}/03_assembly/graphs", \
-        mode: 'copy', \
-        pattern: "*.assembly_graph.gfa"
+    publishDir "${params.outdir}/03_assembly/graphs",
+        mode: 'copy',
+        pattern: "*.assembly_graph_with_scaffolds.gfa"
 
-    publishDir "${params.outdir}/03_assembly/reports", \
-        mode: 'copy', \
-        pattern: "*.assembly_info.txt"
-
-    publishDir "${params.outdir}/03_assembly/reports", \
-        mode: 'copy', \
+    publishDir "${params.outdir}/03_assembly/reports",
+        mode: 'copy',
         pattern: "*.metaspades.log"
 
     input:
@@ -31,7 +27,7 @@ process METASPADES {
         path(reads_r2)
     )
 
-        output:
+    output:
     tuple val(sample),
           val(participant_id),
           val(visit),
@@ -49,8 +45,7 @@ process METASPADES {
 
     cp spades_out/contigs.fasta ${sample}.contigs.fasta
     cp spades_out/scaffolds.fasta ${sample}.scaffolds.fasta
-    cp spades_out/assembly_graph.gfa ${sample}.assembly_graph.gfa
-    cp spades_out/assembly_info.txt ${sample}.assembly_info.txt
+    cp spades_out/assembly_graph_with_scaffolds.gfa ${sample}.assembly_graph_with_scaffolds.gfa
     cp spades_out/spades.log ${sample}.metaspades.log
     """
 }
