@@ -13,6 +13,7 @@ set -euo pipefail
 cd ~/pipelines/MAGFlow
 
 mkdir -p logs
+RUN_ID=$(date +%Y%m%d_%H%M%S)
 
 echo "=================================================="
 echo "MAGFlow started : $(date)"
@@ -24,10 +25,10 @@ echo "=================================================="
     -profile farm22 \
     -resume \
     "$@" \
-    -with-report logs/report.html \
-    -with-trace logs/trace.txt \
-    -with-timeline logs/timeline.html \
-    -with-dag logs/dag.html
+    -with-report logs/report_${RUN_ID}.html \
+    -with-trace logs/trace_${RUN_ID}.txt \
+    -with-timeline logs/timeline_${RUN_ID}.html \
+    -with-dag logs/dag_${RUN_ID}.html
 
 echo "=================================================="
 echo "MAGFlow finished: $(date)"

@@ -12,14 +12,17 @@ process BOWTIE2_HOST_REMOVAL {
 
     publishDir "${params.outdir}/02_host_removal/reads",
         mode: 'copy',
+        overwrite: true,
         pattern: "*.host_removed_*.fastq.gz"
 
     publishDir "${params.outdir}/02_host_removal/logs",
         mode: 'copy',
+        overwrite: true,
         pattern: "*.bowtie2.log"
 
     publishDir "${params.outdir}/02_host_removal/metrics",
         mode: 'copy',
+        overwrite: true,
         pattern: "*.bowtie2.metrics.txt"
 
     input:

@@ -1,0 +1,2 @@
+sample,r1,r2,participant_id,visit
+MAGFlow_test_100k,/lustre/scratch124/pam/teams/team216/shared/MAGFlow_test_data/subsets/100k/MAGFlow_test_100k_R1.fastq.gz,/lustre/scratch124/pam/teams/team216/shared/MAGFlow_test_data/subsets/100k/MAGFlow_test_100k_R2.fastq.gz,TEST001,D1

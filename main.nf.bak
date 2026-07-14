@@ -131,32 +131,10 @@ Allowed visit values are:
             }
 
             /*
-            * Locate FASTQ files
-            *
-            * Two metadata formats are supported:
-            *
-            * 1. Explicit FASTQ paths (recommended)
-            *    sample,r1,r2,participant_id,visit
-            *
-            * 2. Sample IDs only
-            *    sample,participant_id,visit
-            *    (FASTQs are resolved from params.fastq_dir)
-            */
-            def reads_r1
-            def reads_r2
-
-            if (row.r1 && row.r2) {
-
-                reads_r1 = file(row.r1.trim())
-                reads_r2 = file(row.r2.trim())
-
-            }
-            else {
-
-                reads_r1 = file("${params.fastq_dir}/${row.sample}_1.fastq.gz")
-                reads_r2 = file("${params.fastq_dir}/${row.sample}_2.fastq.gz")
-
-            }
+             * Locate FASTQ files
+             */
+            def reads_r1 = file("${params.fastq_dir}/${row.sample}_1.fastq.gz")
+            def reads_r2 = file("${params.fastq_dir}/${row.sample}_2.fastq.gz")
 
             /*
              * Validate FASTQ files
