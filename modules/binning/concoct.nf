@@ -2,15 +2,9 @@ process CONCOCT {
 
     tag "${sample}"
 
-    publishDir "${params.outdir}/05_binning/concoct/${sample}",
+    publishDir "${params.outdir}/05_binning/concoct",
         mode: 'copy',
-        overwrite: true,
-        pattern: "${sample}_concoct/bins/*"
-
-    publishDir "${params.outdir}/05_binning/concoct/${sample}",
-        mode: 'copy',
-        overwrite: true,
-        pattern: "*.concoct.version.txt"
+        overwrite: true
 
     input:
     tuple(

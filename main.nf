@@ -225,6 +225,7 @@ Please verify:
 
     binning_out = BINNING(
         assembly_out.contigs,
-        mapping_out.alignment
+        mapping_out.alignment,
+        preprocessing_out.reads
 )
 }
