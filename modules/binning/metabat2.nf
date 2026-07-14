@@ -2,9 +2,15 @@ process METABAT2 {
 
     tag "${sample}"
 
-    publishDir "${params.outdir}/05_binning/metabat2",
+    publishDir "${params.outdir}/05_binning/metabat2/${sample}",
         mode: 'copy',
-        overwrite: true
+        overwrite: true,
+        pattern: "${sample}_metabat2/*"
+
+    publishDir "${params.outdir}/05_binning/metabat2/${sample}",
+        mode: 'copy',
+        overwrite: true,
+        pattern: "*.metabat2.version.txt"
 
     input:
     tuple(

@@ -1,5 +1,7 @@
 include { METABAT2 } from '../../modules/binning/metabat2'
 
+include { CONCOCT } from '../../modules/binning/concoct'
+
 workflow BINNING {
 
     take:
@@ -36,7 +38,13 @@ workflow BINNING {
 
     metabat2 = METABAT2(metabat2_input)
 
+    concoct = CONCOCT(metabat2_input)
+
     emit:
-    bins    = metabat2.bins
-    version = metabat2.version
+
+    metabat2_bins    = metabat2.bins
+    metabat2_version = metabat2.version
+
+    concoct_bins     = concoct.bins
+    concoct_version  = concoct.version
 }
