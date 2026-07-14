@@ -10,6 +10,25 @@
 
 set -euo pipefail
 
+# ============================================================================
+# Initialise Farm22 environment
+# ============================================================================
+
+if ! type module >/dev/null 2>&1; then
+    source /etc/profile.d/modules.sh
+fi
+
+module load PaM/environment
+module load cellgen/java/23.0.2
+
+echo "=================================================="
+echo "Environment"
+echo "=================================================="
+module list
+echo
+java -version
+echo "=================================================="
+
 cd ~/pipelines/MAGFlow
 
 mkdir -p logs

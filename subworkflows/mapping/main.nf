@@ -39,6 +39,7 @@ workflow MAPPING {
     bowtie2_map = BOWTIE2_MAP(mapping_input)
 
     emit:
+    alignment    = bowtie2_map.alignment
     bam          = bowtie2_map.bam
     bai          = bowtie2_map.bai
     bowtie2_log  = bowtie2_map.log

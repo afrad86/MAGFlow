@@ -45,6 +45,13 @@ process BOWTIE2_MAP {
         val(visit),
         path("${sample}.sorted.bam.bai"),
         emit: bai
+    
+    tuple val(sample),
+        val(participant_id),
+        val(visit),
+        path("${sample}.sorted.bam"),
+        path("${sample}.sorted.bam.bai"),
+        emit: alignment
 
     tuple val(sample),
         val(participant_id),

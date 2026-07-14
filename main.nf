@@ -3,6 +3,7 @@ nextflow.enable.dsl=2
 include { PREPROCESSING } from './subworkflows/preprocessing/main'
 include { ASSEMBLY }      from './subworkflows/assembly/main'
 include { MAPPING }       from './subworkflows/mapping/main'
+include { BINNING }       from './subworkflows/binning/main'
 
 workflow {
 
@@ -222,4 +223,8 @@ Please verify:
         preprocessing_out.reads
 )
 
+    binning_out = BINNING(
+        assembly_out.contigs,
+        mapping_out.alignment
+)
 }
