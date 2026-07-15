@@ -4,6 +4,7 @@ include { PREPROCESSING } from './subworkflows/preprocessing/main'
 include { ASSEMBLY }      from './subworkflows/assembly/main'
 include { MAPPING }       from './subworkflows/mapping/main'
 include { BINNING }       from './subworkflows/binning/main'
+include { DASTOOL_WORKFLOW } from './subworkflows/dastool/main'
 
 workflow {
 
@@ -228,4 +229,12 @@ Please verify:
         mapping_out.alignment,
         preprocessing_out.reads
 )
+
+    dastool_out = DASTOOL_WORKFLOW(
+    assembly_out.contigs,
+    binning_out.metabat2_bins,
+    binning_out.concoct_bins,
+    binning_out.maxbin2_bins
+)
+
 }
