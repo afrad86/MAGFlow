@@ -5,6 +5,7 @@ include { ASSEMBLY }      from './subworkflows/assembly/main'
 include { MAPPING }       from './subworkflows/mapping/main'
 include { BINNING }       from './subworkflows/binning/main'
 include { DASTOOL_WORKFLOW } from './subworkflows/dastool/main'
+include { CHECKM2_WORKFLOW } from './subworkflows/checkm2/main'
 
 workflow {
 
@@ -231,10 +232,14 @@ Please verify:
 )
 
     dastool_out = DASTOOL_WORKFLOW(
-    assembly_out.contigs,
-    binning_out.metabat2_bins,
-    binning_out.concoct_bins,
-    binning_out.maxbin2_bins
+        assembly_out.contigs,
+        binning_out.metabat2_bins,
+        binning_out.concoct_bins,
+        binning_out.maxbin2_bins
+)
+
+    checkm2_out = CHECKM2_WORKFLOW(
+        dastool_out.bins
 )
 
 }
