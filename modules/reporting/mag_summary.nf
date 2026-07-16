@@ -51,6 +51,10 @@ process MAG_SUMMARY {
 
     mkdir -p ${sample}_summary
 
+    ###########################################################################
+    # Version
+    ###########################################################################
+
     {
         echo "========================================"
         echo "MAGFlow MAG Summary"
@@ -58,9 +62,22 @@ process MAG_SUMMARY {
         echo "Date      : \$(date)"
         echo "Host      : \$(hostname)"
         echo "Sample    : ${sample}"
-    } > ${sample}.summary.version.txt
+        echo
 
-    cp ${checkm2_dir}/quality_report.tsv ${sample}_summary/
-    cp ${gtdbtk_dir}/gtdbtk.bac120.summary.tsv ${sample}_summary/
+        python3 --version
+
+    } > ${sample}.summary.version.txt 2>&1
+
+    ###########################################################################
+    # Merge summary
+    ###########################################################################
+
+    python3 ${projectDir}/bin/merge_summary.py \
+        --checkm2 ${checkm2_dir}/quality_report.tsv \
+        --gtdbtk ${gtdbtk_dir}/gtdbtk.bac120.summary.tsv \
+        --sample ${sample} \
+        --participant ${participant_id} \
+        --visit ${visit} \
+        --output ${sample}_summary/mag_summary.tsv
     """
 }
