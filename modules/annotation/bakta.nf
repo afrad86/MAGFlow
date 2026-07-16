@@ -1,17 +1,17 @@
-process MAG_SUMMARY {
+process BAKTA {
 
     tag "${sample}"
 
-    publishDir "${params.outdir}/09_summary",
+    publishDir "${params.outdir}/10_bakta",
         mode: 'copy',
         overwrite: true,
         saveAs: { filename ->
 
-            if (filename == "${sample}_summary") {
+            if (filename == "${sample}_bakta") {
                 return "${sample}/${filename}"
             }
 
-            if (filename == "${sample}.summary.version.txt") {
+            if (filename == "${sample}.bakta.version.txt") {
                 return "${sample}/${filename}"
             }
 
@@ -19,14 +19,12 @@ process MAG_SUMMARY {
         }
 
     input:
+
     tuple(
         val(sample),
         val(participant_id),
         val(visit),
-        path(checkm2_dir),
-        path(gtdbtk_dir),
-        path(bakta_dir),
-        path(coverm_dir)
+        path(dastool_dir)
     )
 
     output:
@@ -35,7 +33,7 @@ process MAG_SUMMARY {
         val(sample),
         val(participant_id),
         val(visit),
-        path("${sample}_summary"),
+        path("${sample}_bakta"),
         emit: results
     )
 
@@ -43,7 +41,7 @@ process MAG_SUMMARY {
         val(sample),
         val(participant_id),
         val(visit),
-        path("${sample}.summary.version.txt"),
+        path("${sample}.bakta.version.txt"),
         emit: version
     )
 
@@ -51,7 +49,7 @@ process MAG_SUMMARY {
     """
     set -euo pipefail
 
-    mkdir -p ${sample}_summary
+    mkdir -p ${sample}_bakta
 
     ###########################################################################
     # Version
@@ -59,29 +57,46 @@ process MAG_SUMMARY {
 
     {
         echo "========================================"
-        echo "MAGFlow MAG Summary"
+        echo "MAGFlow Bakta"
         echo "========================================"
         echo "Date      : \$(date)"
         echo "Host      : \$(hostname)"
         echo "Sample    : ${sample}"
+        echo "CPUs      : ${task.cpus}"
+        echo "Memory    : ${task.memory.toGiga()} GB"
         echo
 
-        python3 --version
+        which bakta
+        echo
 
-    } > ${sample}.summary.version.txt 2>&1
+        bakta --version
+
+    } > ${sample}.bakta.version.txt 2>&1
+
 
     ###########################################################################
-    # Merge summary
+    # Annotate all MAGs
     ###########################################################################
 
-    python3 ${projectDir}/bin/merge_summary.py \
-        --checkm2 ${checkm2_dir}/quality_report.tsv \
-        --gtdbtk ${gtdbtk_dir}/gtdbtk.bac120.summary.tsv \
-        --bakta ${bakta_dir} \
-        --coverm ${coverm_dir}/mag_abundance.normalized.tsv \
-        --sample ${sample} \
-        --participant ${participant_id} \
-        --visit ${visit} \
-        --output ${sample}_summary/mag_summary.tsv
+    shopt -s nullglob
+
+    genomes=( ${dastool_dir}/${sample}_DASTool_bins/*.fa )
+
+    if [ \${#genomes[@]} -eq 0 ]; then
+        echo "ERROR: No MAG FASTA files found."
+        exit 1
+    fi
+
+    for genome in "\${genomes[@]}"
+    do
+
+        mag=\$(basename "\$genome" .fa)
+
+        bakta \
+            --threads ${task.cpus} \
+            --output ${sample}_bakta/\${mag} \
+            "\$genome"
+
+    done
     """
 }

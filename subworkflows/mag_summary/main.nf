@@ -7,30 +7,51 @@ workflow MAG_SUMMARY_WORKFLOW {
     take:
     checkm2_results
     gtdbtk_results
+    bakta_results
+    coverm_results
 
     main:
 
- joined = checkm2_results
-    .join(gtdbtk_results)
-    .map { sample,
-           participant_id,
-           visit,
-           checkm2_dir,
-           participant_id2,
-           visit2,
-           gtdbtk_dir ->
+ checkm2_join = checkm2_results
+        .map { sample, participant_id, visit, checkm2_dir ->
+            tuple([sample, participant_id, visit], checkm2_dir)
+        }
 
-        assert participant_id == participant_id2
-        assert visit == visit2
+    gtdbtk_join = gtdbtk_results
+        .map { sample, participant_id, visit, gtdbtk_dir ->
+            tuple([sample, participant_id, visit], gtdbtk_dir)
+        }
 
-        tuple(
-            sample,
-            participant_id,
-            visit,
-            checkm2_dir,
-            gtdbtk_dir
-        )
-    }
+    bakta_join = bakta_results
+        .map { sample, participant_id, visit, bakta_dir ->
+            tuple([sample, participant_id, visit], bakta_dir)
+        }
+
+    coverm_join = coverm_results
+        .map { sample, participant_id, visit, coverm_dir ->
+            tuple([sample, participant_id, visit], coverm_dir)
+        }
+
+    joined = checkm2_join
+        .join(gtdbtk_join)
+        .join(bakta_join)
+        .join(coverm_join)
+        .map { key, checkm2_dir, gtdbtk_dir, bakta_dir, coverm_dir ->
+
+            def sample = key[0]
+            def participant_id = key[1]
+            def visit = key[2]
+
+            tuple(
+                sample,
+                participant_id,
+                visit,
+                checkm2_dir,
+                gtdbtk_dir,
+                bakta_dir,
+                coverm_dir
+            )
+        }
 
     MAG_SUMMARY(joined)
 

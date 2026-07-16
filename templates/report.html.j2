@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>MAGFlow Report</title>
+
+<style>
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 40px;
+    background: #f8f9fa;
+    color: #222;
+}
+
+h1 {
+    color: #0b5394;
+}
+
+h2 {
+    margin-top: 40px;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 6px;
+}
+
+table {
+    border-collapse: collapse;
+    width: 600px;
+}
+
+th,
+td {
+    border: 1px solid #ccc;
+    padding: 8px;
+}
+
+th {
+    background: #eeeeee;
+    text-align: left;
+}
+
+.footer {
+    margin-top: 50px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>MAGFlow Report</h1>
+
+<h2>Run Information</h2>
+
+<table>
+
+<tr>
+<th>Sample</th>
+<td>{{ sample }}</td>
+</tr>
+
+<tr>
+<th>Participant</th>
+<td>{{ participant }}</td>
+</tr>
+
+<tr>
+<th>Visit</th>
+<td>{{ visit }}</td>
+</tr>
+
+<tr>
+<th>Pipeline Version</th>
+<td>{{ version }}</td>
+</tr>
+
+<tr>
+<th>Generated</th>
+<td>{{ generated }}</td>
+</tr>
+
+</table>
+
+<h2>MAG Summary</h2>
+
+<table>
+
+<tr>
+<th>Total MAGs</th>
+<td>{{ total_mags }}</td>
+</tr>
+
+<tr>
+<th>High Quality</th>
+<td>{{ high_quality }}</td>
+</tr>
+
+<tr>
+<th>Medium Quality</th>
+<td>{{ medium_quality }}</td>
+</tr>
+
+<tr>
+<th>Low Quality</th>
+<td>{{ low_quality }}</td>
+</tr>
+
+<tr>
+<th>Passed Quality Filter</th>
+<td>{{ passed }}</td>
+</tr>
+
+</table>
+
+<div class="footer">
+
+Generated automatically by MAGFlow.
+
+</div>
+
+</body>
+
+</html>

@@ -1,5 +1,6 @@
 nextflow.enable.dsl=2
 
+include { PIPELINE_INFO_WORKFLOW } from './subworkflows/pipeline_info/main'
 include { PREPROCESSING } from './subworkflows/preprocessing/main'
 include { ASSEMBLY }      from './subworkflows/assembly/main'
 include { MAPPING }       from './subworkflows/mapping/main'
@@ -7,9 +8,18 @@ include { BINNING }       from './subworkflows/binning/main'
 include { DASTOOL_WORKFLOW } from './subworkflows/dastool/main'
 include { CHECKM2_WORKFLOW } from './subworkflows/checkm2/main'
 include { GTDBTK_WORKFLOW }  from './subworkflows/gtdbtk/main'
+include { BAKTA_WORKFLOW } from './subworkflows/bakta/main'
+include { COVERM_WORKFLOW } from './subworkflows/coverm/main'
 include { MAG_SUMMARY_WORKFLOW } from './subworkflows/mag_summary/main'
 
 workflow {
+
+    /*
+     * =========================================================================
+     * Pipeline information
+     * =========================================================================
+     */
+    PIPELINE_INFO_WORKFLOW()
 
     /*
      * =========================================================================
@@ -248,9 +258,20 @@ Please verify:
         dastool_out.bins
     )
 
+    bakta_out = BAKTA_WORKFLOW(
+        dastool_out.bins
+    )
+
+    coverm_out = COVERM_WORKFLOW(
+        mapping_out.alignment,
+        dastool_out.bins
+    )
+
     summary_out = MAG_SUMMARY_WORKFLOW(
         checkm2_out.results,
-        gtdbtk_out.results
+        gtdbtk_out.results,
+        bakta_out.results,
+        coverm_out.results
     )
 
 }
