@@ -7,6 +7,7 @@ include { BINNING }       from './subworkflows/binning/main'
 include { DASTOOL_WORKFLOW } from './subworkflows/dastool/main'
 include { CHECKM2_WORKFLOW } from './subworkflows/checkm2/main'
 include { GTDBTK_WORKFLOW }  from './subworkflows/gtdbtk/main'
+include { MAG_SUMMARY_WORKFLOW } from './subworkflows/mag_summary/main'
 
 workflow {
 
@@ -224,27 +225,32 @@ Please verify:
     mapping_out = MAPPING(
         assembly_out.contigs,
         preprocessing_out.reads
-)
+    )
 
     binning_out = BINNING(
         assembly_out.contigs,
         mapping_out.alignment,
         preprocessing_out.reads
-)
+    )
 
     dastool_out = DASTOOL_WORKFLOW(
         assembly_out.contigs,
         binning_out.metabat2_bins,
         binning_out.concoct_bins,
         binning_out.maxbin2_bins
-)
+    )
 
     checkm2_out = CHECKM2_WORKFLOW(
         dastool_out.bins
-)
+    )
 
     gtdbtk_out = GTDBTK_WORKFLOW(
         dastool_out.bins
-)
+    )
+
+    summary_out = MAG_SUMMARY_WORKFLOW(
+        checkm2_out.results,
+        gtdbtk_out.results
+    )
 
 }
