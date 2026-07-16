@@ -6,6 +6,7 @@ include { MAPPING }       from './subworkflows/mapping/main'
 include { BINNING }       from './subworkflows/binning/main'
 include { DASTOOL_WORKFLOW } from './subworkflows/dastool/main'
 include { CHECKM2_WORKFLOW } from './subworkflows/checkm2/main'
+include { GTDBTK_WORKFLOW }  from './subworkflows/gtdbtk/main'
 
 workflow {
 
@@ -239,6 +240,10 @@ Please verify:
 )
 
     checkm2_out = CHECKM2_WORKFLOW(
+        dastool_out.bins
+)
+
+    gtdbtk_out = GTDBTK_WORKFLOW(
         dastool_out.bins
 )
 

@@ -1,3 +1,5 @@
+nextflow.enable.dsl=2
+
 include { CHECKM2 } from '../../modules/qc/checkm2'
 
 workflow CHECKM2_WORKFLOW {
@@ -11,6 +13,6 @@ workflow CHECKM2_WORKFLOW {
 
     emit:
 
-    bins = CHECKM2.out.results
+    results = CHECKM2.out.results
     version = CHECKM2.out.version
 }
