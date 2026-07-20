@@ -108,55 +108,71 @@ Please update:
         .map { row ->
 
             /*
-             * Clean metadata
-             */
-            row.sample = row.sample.trim()
-            row.participant_id = row.participant_id.trim()
-            row.visit = row.visit.trim().toUpperCase()
+            * Clean metadata
+            */
+            row.sample = row.sample?.trim()
+
+            // Optional metadata
+            row.participant_id = row.participant_id?.trim()
+            row.visit = row.visit?.trim()?.toUpperCase()
 
             /*
-             * Validate required metadata
-             */
+            * Validate required metadata
+            */
             assert row.sample :
                 "Metadata error: 'sample' is empty."
 
-            assert row.participant_id :
-                "Metadata error: 'participant_id' is empty for sample '${row.sample}'."
+            /*
+            * Optional metadata defaults
+            */
+            if (!row.participant_id) {
+                row.participant_id = row.sample
+            }
 
-            assert row.visit :
-                "Metadata error: 'visit' is empty for sample '${row.sample}'."
+            if (!row.visit) {
+                row.visit = ""
+            }
 
             /*
-             * Validate visit
-             */
-            if (!(row.visit in VALID_VISITS)) {
+            * Validate visit only if supplied
+            */
+            if (row.visit && !(row.visit in VALID_VISITS)) {
 
                 error """
-Invalid visit '${row.visit}' for sample '${row.sample}'.
+            Invalid visit '${row.visit}' for sample '${row.sample}'.
 
-Allowed visit values are:
+            Allowed visit values are:
 
-    D1
-    M1
-    M2
-    M4
-    M6
-"""
+                D1
+                M1
+                M2
+                M4
+                M6
+            """
 
             }
 
             /*
             * Locate FASTQ files
             *
-            * Two metadata formats are supported:
+            * Supported metadata formats:
             *
-            * 1. Explicit FASTQ paths (recommended)
-            *    sample,r1,r2,participant_id,visit
+            * Required columns:
+            *   sample,r1,r2
             *
-            * 2. Sample IDs only
-            *    sample,participant_id,visit
-            *    (FASTQs are resolved from params.fastq_dir)
+            * Optional columns:
+            *   participant_id
+            *   visit
+            *
+            * Examples:
+            *   sample,r1,r2
+            *   sample,r1,r2,participant_id
+            *   sample,r1,r2,visit
+            *   sample,r1,r2,participant_id,visit
+            *
+            *   FASTQs are resolved from params.fastq_dir.
             */
+
             def reads_r1
             def reads_r2
 
