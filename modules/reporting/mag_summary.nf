@@ -25,7 +25,7 @@ process MAG_SUMMARY {
         val(visit),
         path(checkm2_dir),
         path(gtdbtk_dir),
-        path(bakta_dir),
+        val(bakta_results),
         path(coverm_dir)
     )
 
@@ -52,6 +52,15 @@ process MAG_SUMMARY {
     set -euo pipefail
 
     mkdir -p ${sample}_summary
+    mkdir -p ${sample}_bakta
+
+    ###########################################################################
+    # Reconstruct Bakta directory
+    ###########################################################################
+
+    ${bakta_results.collect { mag, bakta_dir ->
+        "ln -s ${bakta_dir} ${sample}_bakta/${mag}_bakta"
+    }.join('\n')}
 
     ###########################################################################
     # Version
@@ -77,7 +86,7 @@ process MAG_SUMMARY {
     python3 ${projectDir}/bin/merge_summary.py \
         --checkm2 ${checkm2_dir}/quality_report.tsv \
         --gtdbtk ${gtdbtk_dir}/gtdbtk.bac120.summary.tsv \
-        --bakta ${bakta_dir} \
+        --bakta ${sample}_bakta \
         --coverm ${coverm_dir}/mag_abundance.normalized.tsv \
         --sample ${sample} \
         --participant ${participant_id} \

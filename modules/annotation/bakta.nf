@@ -1,17 +1,17 @@
 process BAKTA {
 
-    tag "${sample}"
+    tag "${sample}:${mag}"
 
     publishDir "${params.outdir}/10_bakta",
         mode: 'copy',
         overwrite: true,
         saveAs: { filename ->
 
-            if (filename == "${sample}_bakta") {
+            if (filename == "${mag}_bakta") {
                 return "${sample}/${filename}"
             }
 
-            if (filename == "${sample}.bakta.version.txt") {
+            if (filename == "${mag}.bakta.version.txt") {
                 return "${sample}/${filename}"
             }
 
@@ -24,7 +24,8 @@ process BAKTA {
         val(sample),
         val(participant_id),
         val(visit),
-        path(dastool_dir)
+        val(mag),
+        path(genome)
     )
 
     output:
@@ -33,7 +34,8 @@ process BAKTA {
         val(sample),
         val(participant_id),
         val(visit),
-        path("${sample}_bakta"),
+        val(mag),
+        path("${mag}_bakta"),
         emit: results
     )
 
@@ -41,19 +43,14 @@ process BAKTA {
         val(sample),
         val(participant_id),
         val(visit),
-        path("${sample}.bakta.version.txt"),
+        val(mag),
+        path("${mag}.bakta.version.txt"),
         emit: version
     )
 
     script:
     """
     set -euo pipefail
-
-    mkdir -p ${sample}_bakta
-
-    ###########################################################################
-    # Version
-    ###########################################################################
 
     {
         echo "========================================"
@@ -62,6 +59,7 @@ process BAKTA {
         echo "Date      : \$(date)"
         echo "Host      : \$(hostname)"
         echo "Sample    : ${sample}"
+        echo "MAG       : ${mag}"
         echo "CPUs      : ${task.cpus}"
         echo "Memory    : ${task.memory.toGiga()} GB"
         echo
@@ -71,32 +69,11 @@ process BAKTA {
 
         bakta --version
 
-    } > ${sample}.bakta.version.txt 2>&1
+    } > ${mag}.bakta.version.txt 2>&1
 
-
-    ###########################################################################
-    # Annotate all MAGs
-    ###########################################################################
-
-    shopt -s nullglob
-
-    genomes=( ${dastool_dir}/${sample}_DASTool_bins/*.fa )
-
-    if [ \${#genomes[@]} -eq 0 ]; then
-        echo "ERROR: No MAG FASTA files found."
-        exit 1
-    fi
-
-    for genome in "\${genomes[@]}"
-    do
-
-        mag=\$(basename "\$genome" .fa)
-
-        bakta \
-            --threads ${task.cpus} \
-            --output ${sample}_bakta/\${mag} \
-            "\$genome"
-
-    done
+    bakta \
+        --threads ${task.cpus} \
+        --output ${mag}_bakta \
+        ${genome}
     """
 }

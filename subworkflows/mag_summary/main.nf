@@ -12,7 +12,7 @@ workflow MAG_SUMMARY_WORKFLOW {
 
     main:
 
- checkm2_join = checkm2_results
+    checkm2_join = checkm2_results
         .map { sample, participant_id, visit, checkm2_dir ->
             tuple([sample, participant_id, visit], checkm2_dir)
         }
@@ -23,8 +23,8 @@ workflow MAG_SUMMARY_WORKFLOW {
         }
 
     bakta_join = bakta_results
-        .map { sample, participant_id, visit, bakta_dir ->
-            tuple([sample, participant_id, visit], bakta_dir)
+        .map { sample, participant_id, visit, mag_results ->
+            tuple([sample, participant_id, visit], mag_results)
         }
 
     coverm_join = coverm_results
@@ -36,7 +36,7 @@ workflow MAG_SUMMARY_WORKFLOW {
         .join(gtdbtk_join)
         .join(bakta_join)
         .join(coverm_join)
-        .map { key, checkm2_dir, gtdbtk_dir, bakta_dir, coverm_dir ->
+        .map { key, checkm2_dir, gtdbtk_dir, mag_results, coverm_dir ->
 
             def sample = key[0]
             def participant_id = key[1]
@@ -48,7 +48,7 @@ workflow MAG_SUMMARY_WORKFLOW {
                 visit,
                 checkm2_dir,
                 gtdbtk_dir,
-                bakta_dir,
+                mag_results,
                 coverm_dir
             )
         }

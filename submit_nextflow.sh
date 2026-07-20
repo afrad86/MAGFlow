@@ -32,17 +32,35 @@ echo "=================================================="
 cd ~/pipelines/MAGFlow
 
 mkdir -p logs
+
 RUN_ID=$(date +%Y%m%d_%H%M%S)
+
+# Default output directory
+OUTDIR="${OUTDIR:-$PWD/results}"
+
+mkdir -p "$OUTDIR"
 
 echo "=================================================="
 echo "MAGFlow started : $(date)"
+echo "Run ID          : ${RUN_ID}"
 echo "Host            : $(hostname)"
 echo "Directory       : $(pwd)"
+echo "Output          : ${OUTDIR}"
+echo
+
+echo "Nextflow        : $(~/software/nextflow -version | head -1)"
+echo "Java            : $(java -version 2>&1 | head -1)"
+
+if git rev-parse --git-dir >/dev/null 2>&1; then
+    echo "Git commit      : $(git rev-parse --short HEAD)"
+fi
+
 echo "=================================================="
 
 ~/software/nextflow run main.nf \
     -profile farm22 \
     -resume \
+    --outdir "$OUTDIR" \
     "$@" \
     -with-report logs/report_${RUN_ID}.html \
     -with-trace logs/trace_${RUN_ID}.txt \

@@ -49,9 +49,39 @@ workflow DASTOOL_WORKFLOW {
 
     dastool = DASTOOL(dastool_input)
 
+    mags = dastool.bins.flatMap { sample, participant_id, visit, dastool_dir ->
+
+        def binsDir = dastool_dir.resolve("${sample}_DASTool_bins")
+
+        if (!binsDir.exists()) {
+            throw new IllegalStateException("DAS Tool bins directory not found: ${binsDir}")
+        }
+
+        def fastaFiles = binsDir
+            .listFiles()
+            ?.findAll { it.isFile() && it.name.endsWith('.fa') }
+            ?.sort { it.name } ?: []
+
+        if (fastaFiles.isEmpty()) {
+            throw new IllegalStateException("No MAG FASTA files found in ${binsDir}")
+        }
+
+        fastaFiles.collect { fasta ->
+            tuple(
+                sample,
+                participant_id,
+                visit,
+                fasta.baseName,
+                fasta
+            )
+        }
+    }
+
     emit:
 
     bins = dastool.bins
+
+    mags = mags
 
     version = dastool.version
 }

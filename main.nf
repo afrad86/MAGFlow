@@ -162,8 +162,20 @@ Allowed visit values are:
 
             if (row.r1 && row.r2) {
 
-                reads_r1 = file(row.r1.trim())
-                reads_r2 = file(row.r2.trim())
+                def r1 = row.r1.trim()
+                def r2 = row.r2.trim()
+
+                if (r1.startsWith("/")) {
+                    reads_r1 = file(r1)
+                } else {
+                    reads_r1 = file("${params.fastq_dir}/${r1}")
+                }
+
+                if (r2.startsWith("/")) {
+                    reads_r2 = file(r2)
+                } else {
+                    reads_r2 = file("${params.fastq_dir}/${r2}")
+                }
 
             }
             else {
@@ -259,7 +271,7 @@ Please verify:
     )
 
     bakta_out = BAKTA_WORKFLOW(
-        dastool_out.bins
+        dastool_out.mags
     )
 
     coverm_out = COVERM_WORKFLOW(
