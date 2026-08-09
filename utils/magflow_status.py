@@ -186,15 +186,29 @@ class TraceParser:
 
     def parse_task_name(self, name: str):
 
+        # Sample-specific task:
+        # WORKFLOW:PROCESS (SAMPLE)
         if ":" in name and "(" in name and name.endswith(")"):
 
             workflow_process, sample = name.rsplit("(", 1)
 
             sample = sample.rstrip(")").strip()
 
+            # Keep only the biological sample ID.
+            if "#" in sample:
+                m = re.match(r'^(.*?#\d+)', sample)
+                if m:
+                    sample = m.group(1)
+
             workflow, process = workflow_process.split(":", 1)
 
             return workflow.strip(), process.strip(), sample
+
+        # Pipeline-level task without a sample:
+        # WORKFLOW:PROCESS
+        if ":" in name:
+            workflow, process = name.rsplit(":", 1)
+            return workflow.strip(), process.strip(), ""
 
         return "", name.strip(), ""
 
@@ -233,7 +247,8 @@ class TraceParser:
 
                 job_id = int(record["native_id"]) if record["native_id"] else None
 
-                exit_code = int(record["exit"]) if record["exit"] else None
+                exit_value = record["exit"].strip()
+                exit_code = int(exit_value) if exit_value not in ("", "-") else None
 
                 duration = record.get("duration") or None
 
@@ -366,6 +381,29 @@ class StatusEngine:
 
             completed = 0
 
+            # Global pipeline-level stages do not belong to a sample.
+            # Count them directly from the full task list.
+            if stage["name"] == "Pipeline information":
+
+                completed = int(
+                    any(
+                        task.process in stage["processes"]
+                        and task.status in FINISHED
+                        for task in self.model.tasks
+                    )
+                )
+
+                progress.append(
+                    StageProgress(
+                        stage=stage["name"],
+                        completed=completed,
+                        total=1,
+                    )
+                )
+
+                continue
+
+            # Sample-level stages
             for sample in self.model.samples.values():
 
                 if any(
@@ -437,7 +475,7 @@ class Dashboard:
 
 if __name__ == "__main__":
 
-    logs = Path("~/pipelines/MAGFlow/logs").expanduser()
+    logs = Path("/lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_logs")
 
     locator = RunLocator(logs)
 
