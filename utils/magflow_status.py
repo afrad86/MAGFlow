@@ -497,11 +497,6 @@ class TraceParser:
                 ")"
             ).strip()
 
-            sample = self.sample_aliases.get(
-                sample,
-                sample
-            )
-
             workflow, process = workflow_process.split(
                 ":",
                 1
@@ -753,11 +748,6 @@ class LiveNextflowParser:
                 ")"
             ).strip()
 
-            sample = self.sample_aliases.get(
-                sample,
-                sample
-            )
-
             workflow, process = workflow_process.split(
                 ":",
                 1
@@ -956,6 +946,22 @@ class LiveNextflowParser:
 # MERGE OLD TRACE + CURRENT RESUME
 # ============================================================================
 
+def task_identity(task):
+    """
+    Use the Nextflow work directory as the stable task identity.
+
+    Process/sample names are not guaranteed to be unique because metadata
+    aliases can map multiple sequencing samples to the same participant/visit.
+    """
+
+    if task.workdir:
+        return str(task.workdir)
+
+    if task.job_id is not None:
+        return f"{task.name}::{task.job_id}"
+
+    return task.name
+
 def merge_tasks(
     trace_tasks,
     live_tasks,
@@ -973,7 +979,7 @@ def merge_tasks(
         if not task.name:
             continue
 
-        merged[task.name] = task
+        merged[task_identity(task)] = task
 
     # ------------------------------------------------------------------------
     # Overlay the live current resume session.
@@ -987,7 +993,7 @@ def merge_tasks(
         if not task.name:
             continue
 
-        merged[task.name] = task
+        merged[task_identity(task)] = task
 
     # ------------------------------------------------------------------------
     # Overlay current LSF state.
@@ -1275,7 +1281,9 @@ class Dashboard:
 
         sample_tasks = {}
 
-        for task in self.engine.model.tasks:
+        for index, task in enumerate(
+            self.engine.model.tasks
+        ):
 
             if task.process != process:
                 continue
@@ -1285,10 +1293,29 @@ class Dashboard:
 
             # PROKKA tasks operate on individual MAGs, but the
             # dashboard reports PROKKA at sample level.
-            sample_key = task.sample
+            if process == "PROKKA":
 
-            if process == "PROKKA" and ":" in sample_key:
-                sample_key = sample_key.split(":", 1)[0]
+                sample_key = task.sample
+
+                if ":" in sample_key:
+                    sample_key = sample_key.split(
+                        ":",
+                        1
+                    )[0]
+
+            else:
+
+                # Other processes are sample-level, but the
+                # participant/visit label is not guaranteed to
+                # be unique. Use the task instance identity so
+                # two distinct Nextflow samples are not collapsed.
+                sample_key = (
+                    task.sample,
+                    task.job_id,
+                    str(task.workdir)
+                    if task.workdir
+                    else index
+                )
 
             sample_tasks.setdefault(
                 sample_key,
@@ -1415,81 +1442,42 @@ class Dashboard:
             )
 
         # ------------------------------------------------------------
-        # Other sample-level processes.
+        # Other processes are represented by individual Nextflow
+        # task instances.
+        #
+        # Do NOT group these by task.sample because participant/visit
+        # aliases are not guaranteed to be unique.
         # ------------------------------------------------------------
 
-        sample_tasks = {}
-
-        for task in self.engine.model.tasks:
-
-            if task.process != process:
-                continue
-
-            if not task.sample:
-                continue
-
-            sample_tasks.setdefault(
-                task.sample,
-                []
-            ).append(task)
-
-        completed_samples = set()
-        running_samples = set()
-        failed_samples = set()
-
-        for sample, tasks in sample_tasks.items():
-
-            if any(
-                task.status in (
-                    "RUNNING",
-                    "SUBMITTED"
-                )
-                for task in tasks
-            ):
-
-                running_samples.add(sample)
-                continue
-
-            if any(
-                task.status == "FAILED"
-                for task in tasks
-            ):
-
-                failed_samples.add(sample)
-                continue
-
-            if tasks and all(
-                task.status in (
-                    "COMPLETED",
-                    "CACHED"
-                )
-                for task in tasks
-            ):
-
-                completed_samples.add(sample)
-
-        # Current LSF state.
-
-        running_samples.update({
-            task.sample
-            for task in self.lsf_tasks
+        process_tasks = [
+            task
+            for task in self.engine.model.tasks
             if task.process == process
             and task.sample
-            and task.status == "RUN"
-        })
+        ]
 
-        completed = len(
-            completed_samples
-            - running_samples
+        completed = sum(
+            1
+            for task in process_tasks
+            if task.status in (
+                "COMPLETED",
+                "CACHED"
+            )
         )
 
-        running = len(
-            running_samples
+        running = sum(
+            1
+            for task in process_tasks
+            if task.status in (
+                "RUNNING",
+                "SUBMITTED"
+            )
         )
 
-        failed = len(
-            failed_samples
-            - running_samples
+        failed = sum(
+            1
+            for task in process_tasks
+            if task.status == "FAILED"
         )
 
         if self.expected_samples is not None:
