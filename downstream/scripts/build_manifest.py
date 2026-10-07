@@ -44,6 +44,14 @@ def find_proteins(root, sample, mag):
     return None
 
 
+def stable_participant_id(participant, visit):
+    """Remove a visit suffix when metadata embeds the visit in the ID."""
+    suffix = f'_{visit}' if visit else ''
+    if suffix and participant.endswith(suffix):
+        return participant[:-len(suffix)]
+    return participant
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--results-dir', required=True, type=Path,
@@ -65,6 +73,8 @@ def main():
                 die(f'{summary} needs columns: {", ".join(sorted(required))}')
             for row in reader:
                 sample, mag = row['sample'].strip(), row['mag_id'].strip()
+                participant = row['participant_id'].strip()
+                visit = row['visit'].strip()
                 fasta = find_mag(root, sample, mag)
                 protein = find_proteins(root, sample, mag)
                 # Some older Prokka summary-generation runs can include the
@@ -77,7 +87,7 @@ def main():
                     missing.append(f'{sample}/{mag}: MAG={fasta or "missing"}, protein={protein or "missing"}')
                     continue
                 species = row.get('species', '').strip() or 'NA'
-                rows.append([sample, row['participant_id'].strip(), row['visit'].strip(), mag,
+                rows.append([sample, stable_participant_id(participant, visit), visit, mag,
                              species, str(fasta), str(protein)])
 
     if missing:

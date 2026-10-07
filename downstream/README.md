@@ -11,7 +11,7 @@ This is an independent Nextflow DSL2 entrypoint for the four CATI feature-genera
 
 ## Input manifest
 
-Generate the manifest from existing MAGFlow outputs with `python3 downstream/scripts/build_manifest.py --results-dir /path/to/MAGFlow_results --output /path/to/cati_mag_manifest.tsv`. The helper reads `09_summary/**/mag_summary.tsv`, matches MAG FASTAs in `06_dastool`, and resolves protein FASTAs from either `10_bakta` or `10_prokka`. It stops with a list of any MAGs that cannot be matched. You can also create a manifest manually with the exact headers shown in [`input_manifest.example.tsv`](input_manifest.example.tsv):
+Generate the manifest from existing MAGFlow outputs with `python3 downstream/scripts/build_manifest.py --results-dir /path/to/MAGFlow_results --output /path/to/cati_mag_manifest.tsv`. The helper reads `09_summary/**/mag_summary.tsv`, matches MAG FASTAs in `06_dastool`, and resolves protein FASTAs from either `10_bakta` or `10_prokka` (including Prokka files whose basename differs from the MAG ID but are inside that MAG's annotation directory). It stops with a list of any MAGs that cannot be matched. If a summary's `participant_id` ends in `_<visit>` (for example, `CTNH_062_22_2_M6` with visit `M6`), the helper removes that exact suffix so longitudinal comparisons use `CTNH_062_22_2` as the stable participant key. It leaves other participant IDs unchanged. You can also create a manifest manually with the exact headers shown in [`input_manifest.example.tsv`](input_manifest.example.tsv); for manual manifests, `participant_id` must be stable across visits:
 
 | Column | Meaning |
 | --- | --- |
