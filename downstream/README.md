@@ -71,6 +71,12 @@ python3 scripts/build_manifest.py \
   --output /path/to/cati_mag_manifest.tsv
 ```
 
+### Adding visits or participants later
+
+The manifest builder scans all `09_summary/**/mag_summary.tsv` files under the supplied results directory; it does not assume a fixed number of samples, participants, or visit labels. When MAGFlow publishes additional visits (such as M6, M12, or M24) or new participants, rebuild the manifest from the same complete `MAGFlow_results` directory. The helper uses `visit` as a separate field and removes a matching terminal `_<visit>` suffix from `participant_id`, so visit-qualified identifiers such as `CTNH_062_22_2_M12` group under the stable participant key `CTNH_062_22_2`.
+
+For each expanded data release, run this workflow with the updated full manifest, a **new versioned `--outdir`**, the same persistent `--work_dir`, and `-resume`. Existing per-MAG analyses can then be reused from the Nextflow cache; new MAGs are analyzed, affected participant/species FastANI groups are recalculated, and the cohort tables are rebuilt. The new output directory preserves the previous release. Do not reuse an older output directory for a changed manifest: published aggregate tables use `overwrite: false` and could otherwise remain from the previous release. If database snapshots or analysis parameters change, use a new work directory too.
+
 Use the same `--outdir`, `--work_dir`, manifest, parameters and database snapshots with `-resume` to reuse completed tasks. Keep the work directory because it contains Nextflow intermediates (including eggNOG search files) required for resume; it may be much larger than the compact published tables. Use a new output/work directory when changing databases or parameters; this keeps prior feature tables intact and avoids stale published files. Do not run the original `main.nf` for this task.
 
 ### Main parameters
