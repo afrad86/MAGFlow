@@ -25,9 +25,19 @@ def find_proteins(root, sample, mag):
         if not base.is_dir():
             continue
         for tool in ('bakta', 'prokka'):
-            expected = base / f'{mag}_{tool}' / f'{mag}.faa'
+            mag_dir = base / f'{mag}_{tool}'
+            expected = mag_dir / f'{mag}.faa'
             if expected.is_file():
                 return expected
+            # Prokka may use a generated locus tag as the FAA filename
+            # (for example, 0_prokka/PROKKA_09252026.faa). The enclosing
+            # per-MAG directory still provides an unambiguous association.
+            if mag_dir.is_dir():
+                faa_files = sorted(mag_dir.glob('*.faa'))
+                if len(faa_files) == 1:
+                    return faa_files[0]
+                if len(faa_files) > 1:
+                    return None
         matches = sorted(base.rglob(f'{mag}.faa'))
         if len(matches) == 1:
             return matches[0]
@@ -57,6 +67,12 @@ def main():
                 sample, mag = row['sample'].strip(), row['mag_id'].strip()
                 fasta = find_mag(root, sample, mag)
                 protein = find_proteins(root, sample, mag)
+                # Some older Prokka summary-generation runs can include the
+                # annotation's generated locus tag as a row, even though it
+                # is not a DASTool MAG. Keep the DASTool MAG as the unit of
+                # analysis and omit only this recognizable annotation-only row.
+                if fasta is None and mag.startswith('PROKKA_') and protein is not None:
+                    continue
                 if fasta is None or protein is None:
                     missing.append(f'{sample}/{mag}: MAG={fasta or "missing"}, protein={protein or "missing"}')
                     continue
