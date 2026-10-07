@@ -71,6 +71,15 @@ python3 scripts/build_manifest.py \
   --output /path/to/cati_mag_manifest.tsv
 ```
 
+For the CATI Farm22 paths, the repeatable shortcut is:
+
+```bash
+cd ~/pipelines/MAGFlow-downstream-cati/downstream
+./scripts/rebuild_cati_manifest.sh
+```
+
+This scans the standard CATI `MAGFlow_results` directory and writes `~/pipelines/CATI_downstream_manifest.tsv`, replacing the previous generated manifest. It reports MAG-record, sample-visit, participant and per-visit counts. To use a different results directory, set `MAGFLOW_RESULTS_DIR`; to write the manifest elsewhere, pass the desired output path as the first argument.
+
 ### Adding visits or participants later
 
 The manifest builder scans all `09_summary/**/mag_summary.tsv` files under the supplied results directory; it does not assume a fixed number of samples, participants, or visit labels. When MAGFlow publishes additional visits (such as M6, M12, or M24) or new participants, rebuild the manifest from the same complete `MAGFlow_results` directory. The helper uses `visit` as a separate field and removes a matching terminal `_<visit>` suffix from `participant_id`, so visit-qualified identifiers such as `CTNH_062_22_2_M12` group under the stable participant key `CTNH_062_22_2`.

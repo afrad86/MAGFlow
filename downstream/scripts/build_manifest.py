@@ -3,6 +3,7 @@
 import argparse
 import csv
 import sys
+from collections import Counter
 from pathlib import Path
 
 
@@ -107,7 +108,19 @@ def main():
         writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
         writer.writerow(header)
         writer.writerows(rows)
+    sample_visits = {(row[0], row[1], row[2]) for row in rows}
+    participants = {row[1] for row in rows}
+    participants_by_visit = Counter((row[2], row[1]) for row in rows)
     print(f'Wrote {len(rows)} MAG records to {args.output}')
+    print(f'Sample visits: {len(sample_visits)}')
+    print(f'Participants: {len(participants)}')
+    print('Visit\tSample visits\tParticipants')
+    for visit in sorted({row[2] for row in rows}):
+        sample_count = sum(1 for sample, participant, current_visit in sample_visits
+                           if current_visit == visit)
+        participant_count = sum(1 for current_visit, participant in participants_by_visit
+                                if current_visit == visit)
+        print(f'{visit}\t{sample_count}\t{participant_count}')
 
 
 if __name__ == '__main__':
