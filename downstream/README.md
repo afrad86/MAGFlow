@@ -1,6 +1,6 @@
 # MAGFlow downstream CATI feature analyses
 
-This is an independent Nextflow DSL2 entrypoint for the four CATI feature-generation analyses. It does not change or invoke the completed `../main.nf` pipeline. Inputs are the existing per-MAG FASTA and predicted protein FASTA from Bakta or Prokka, plus a metadata manifest. Outputs are published only under the new `--outdir` supplied for this run.
+This is an independent Nextflow DSL2 entrypoint for the four CATI feature-generation analyses. It does not change or invoke the completed `../main.nf` pipeline. Inputs are the existing per-MAG FASTA and predicted protein FASTA from Bakta or Prokka, plus current and pending metadata manifests. Batch outputs are published under the new `--outdir`; the Farm22 runner also merges compact cohort tables into a persistent state directory after successful runs.
 
 ## Analyses
 
@@ -11,7 +11,7 @@ This is an independent Nextflow DSL2 entrypoint for the four CATI feature-genera
 
 ## Input manifest
 
-Generate the manifest from existing MAGFlow outputs with `python3 downstream/scripts/build_manifest.py --results-dir /path/to/MAGFlow_results --output /path/to/cati_mag_manifest.tsv`. The helper reads `09_summary/**/mag_summary.tsv`, matches MAG FASTAs in `06_dastool`, and resolves protein FASTAs from either `10_bakta` or `10_prokka` (including Prokka files whose basename differs from the MAG ID but are inside that MAG's annotation directory). It stops with a list of any MAGs that cannot be matched. If a summary's `participant_id` ends in `_<visit>` (for example, `CTNH_062_22_2_M6` with visit `M6`), the helper removes that exact suffix so longitudinal comparisons use `CTNH_062_22_2` as the stable participant key. It leaves other participant IDs unchanged. You can also create a manifest manually with the exact headers shown in [`input_manifest.example.tsv`](input_manifest.example.tsv); for manual manifests, `participant_id` must be stable across visits:
+The manifest builder reads `09_summary/**/mag_summary.tsv`, matches MAG FASTAs in `06_dastool`, and resolves protein FASTAs from either `10_bakta` or `10_prokka` (including Prokka files whose basename differs from the MAG ID but are inside that MAG's annotation directory). It stops with a list of any MAGs that cannot be matched. If a summary's `participant_id` ends in `_<visit>` (for example, `CTNH_062_22_2_M6` with visit `M6`), the helper removes that exact suffix so longitudinal comparisons use `CTNH_062_22_2` as the stable participant key. It leaves other participant IDs unchanged. You can also create manifests manually with the exact headers shown in [`input_manifest.example.tsv`](input_manifest.example.tsv); for manual manifests, `participant_id` must be stable across visits:
 
 | Column | Meaning |
 | --- | --- |
@@ -48,28 +48,18 @@ Pinned Conda environment files are in `envs/`. The `conda` profile enables those
 
 The environment pins are AMRFinderPlus 4.2.7, DIAMOND 2.1.9, eggNOG-mapper 2.1.12, FastANI 1.34, and Python 3.12 for table normalization. AMRFinderPlus software and database versions must be compatible; update the database with the same installed software release. The tools run once per MAG (and FastANI once per participant/species group), so this launches many independent tasks for the full CATI MAG collection.
 
-Example (run from the `downstream/` directory so the original pipeline's `nextflow.config` is not loaded; choose a new downstream output directory and separate persistent work directory, and do not point either at `MAGFlow_results`):
+On Farm22, rebuild the pending manifest, then launch a batch with the wrapper below. It runs Nextflow from this standalone downstream folder, sends only pending MAGs to AMR, virulence and function, uses the complete manifest for incremental strain comparisons, and merges/checkpoints results only if Nextflow succeeds:
 
 ```bash
-cd /path/to/MAGFlow/downstream
-mkdir -p /path/to/CATI_feature_results_v1
-nextflow run main.nf \
-  -profile farm22,conda \
-  --input /path/to/cati_mag_manifest.tsv \
-  --outdir /path/to/CATI_feature_results_v1 \
-  --work_dir /path/to/CATI_feature_work_v1 \
+cd ~/pipelines/MAGFlow-downstream-cati/downstream
+./scripts/rebuild_cati_manifest.sh
+./scripts/run_cati_batch.sh ~/pipelines/CATI_downstream_batches/initial \
   --amrfinder_db /path/to/amrfinderplus/data/latest \
   --vfdb_db /path/to/vfdb/vfdb_setA \
   --eggnog_data /path/to/eggnog-mapper/data
 ```
 
-Create the manifest first with:
-
-```bash
-python3 scripts/build_manifest.py \
-  --results-dir /path/to/MAGFlow_results \
-  --output /path/to/cati_mag_manifest.tsv
-```
+Choose a new batch output directory for each successful or resumed batch. The merged cumulative tables are kept in `~/pipelines/CATI_downstream_state/tables/`. Each batch output directory also retains that batch's per-MAG and per-group files. If Nextflow fails, the wrapper will not merge outputs or advance the processed checkpoint; fix the issue and rerun with the same pending manifest and batch output directory.
 
 For the CATI Farm22 paths, the repeatable shortcut is:
 
@@ -78,15 +68,15 @@ cd ~/pipelines/MAGFlow-downstream-cati/downstream
 ./scripts/rebuild_cati_manifest.sh
 ```
 
-This scans the standard CATI `MAGFlow_results` directory and writes `~/pipelines/CATI_downstream_manifest.tsv`, replacing the previous generated manifest. It reports MAG-record, sample-visit, participant and per-visit counts. To use a different results directory, set `MAGFLOW_RESULTS_DIR`; to write the manifest elsewhere, pass the desired output path as the first argument.
+This scans the standard CATI `MAGFlow_results` directory and writes two manifests: the complete current inventory at `~/pipelines/CATI_downstream_state/current_manifest.tsv`, and only new or changed MAGs at `~/pipelines/CATI_downstream_manifest.tsv`. It compares against `processed_manifest.tsv`, which is advanced only after a successful analysis and table merge. It reports counts for both the full cohort and pending batch. To use a different results directory, set `MAGFLOW_RESULTS_DIR`; to change the state directory, set `CATI_DOWNSTREAM_STATE_DIR`; to write the pending manifest elsewhere, pass its path as the first argument.
 
 ### Adding visits or participants later
 
-The manifest builder scans all `09_summary/**/mag_summary.tsv` files under the supplied results directory; it does not assume a fixed number of samples, participants, or visit labels. When MAGFlow publishes additional visits (such as M6, M12, or M24) or new participants, rebuild the manifest from the same complete `MAGFlow_results` directory. The helper uses `visit` as a separate field and removes a matching terminal `_<visit>` suffix from `participant_id`, so visit-qualified identifiers such as `CTNH_062_22_2_M12` group under the stable participant key `CTNH_062_22_2`.
+The manifest builder scans all `09_summary/**/mag_summary.tsv` files under the supplied results directory; it does not assume a fixed number of samples, participants, or visit labels. On the first build, every MAG is pending, so the initial downstream analysis covers the current cohort once. After a batch succeeds and is finalized, the processed checkpoint records the complete inventory. Later builds put only new or changed `(sample, mag_id)` records in the pending manifest; file size and modification time are checked so updated inputs are reprocessed without hashing the full sequence collection. New M6, M12, M24 visits or new participants therefore enter the pending batch automatically.
 
-For each expanded data release, run this workflow with the updated full manifest, a **new versioned `--outdir`**, the same persistent `--work_dir`, and `-resume`. Existing per-MAG analyses can then be reused from the Nextflow cache; new MAGs are analyzed, affected participant/species FastANI groups are recalculated, and the cohort tables are rebuilt. The new output directory preserves the previous release. Do not reuse an older output directory for a changed manifest: published aggregate tables use `overwrite: false` and could otherwise remain from the previous release. If database snapshots or analysis parameters change, use a new work directory too.
+AMR, VFDB and eggNOG receive only pending MAG records. FastANI receives the complete inventory for groups containing pending MAGs, but compares only new-to-old, old-to-new, or new-to-new pairs; old-to-old pairs are not recalculated. After success, the finalizer replaces previous rows for affected MAGs, appends the batch rows, and preserves unrelated prior rows in the cumulative tables. Use a new batch `--outdir` for each run and the same persistent `--work_dir` with `-resume`. If database snapshots or analysis parameters change, start a separate state/output series so cumulative results do not mix incompatible runs.
 
-Use the same `--outdir`, `--work_dir`, manifest, parameters and database snapshots with `-resume` to reuse completed tasks. Keep the work directory because it contains Nextflow intermediates (including eggNOG search files) required for resume; it may be much larger than the compact published tables. Use a new output/work directory when changing databases or parameters; this keeps prior feature tables intact and avoids stale published files. Do not run the original `main.nf` for this task.
+Keep the work directory because it contains Nextflow intermediates (including eggNOG search files) required for resume; it may be much larger than the compact published tables. If the pending manifest has zero records, skip Nextflow and finalization. Do not run the original `main.nf` for this task.
 
 ### Main parameters
 
@@ -103,7 +93,7 @@ AMRFinderPlus uses its curated thresholds by default. Results should not be inte
 
 ## Outputs
 
-Per-MAG and per-group normalized tables are retained under `per_mag/` and `per_group/`. Four cohort-level tab-separated feature tables are written under `tables/`:
+Each batch output directory retains that batch's per-MAG and per-group normalized tables under `per_mag/` and `per_group/`. The Farm22 runner merges four cumulative tab-separated cohort tables under `~/pipelines/CATI_downstream_state/tables/`:
 
 * `amr_features.tsv` — sample, participant, visit, MAG, determinant/class, method, identity/coverage and coordinates/evidence fields.
 * `virulence_features.tsv` — sample, participant, visit, MAG, protein query, VFDB subject, identity, query coverage, E-value and score.

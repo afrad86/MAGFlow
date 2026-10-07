@@ -11,6 +11,11 @@ TABLES = [
     ('*_eggnog.tsv', 'functional_annotations.tsv'),
     ('*_fastani.tsv', 'strain_pairwise_fastani.tsv'),
 ]
+STRAIN_FIELDS = [
+    'participant_id', 'species', 'query_sample', 'query_visit', 'query_mag_id',
+    'reference_sample', 'reference_visit', 'reference_mag_id', 'ani_percent',
+    'matching_fragments', 'query_fragments', 'query_fragment_fraction',
+]
 
 
 def main():
@@ -19,6 +24,10 @@ def main():
         header = None
         with open(output, 'w', newline='') as dst:
             writer = None
+            if not files and output == 'strain_pairwise_fastani.tsv':
+                writer = csv.writer(dst, delimiter='\t', lineterminator='\n')
+                writer.writerow(STRAIN_FIELDS)
+                continue
             for path in files:
                 with open(path, newline='') as src:
                     reader = csv.reader(src, delimiter='\t')

@@ -53,18 +53,50 @@ def stable_participant_id(participant, visit):
     return participant
 
 
+def manifest_rows(path):
+    with path.open(newline='', encoding='utf-8') as handle:
+        return list(csv.DictReader(handle, delimiter='\t'))
+
+
+def record_key(row):
+    return (row['sample'], row['mag_id'])
+
+
+def record_signature(row):
+    # File size and mtime catch updated MAG/protein files without checksumming
+    # the full 40+ GB sequence collection on every manifest refresh.
+    fields = ('participant_id', 'visit', 'species', 'mag_fasta', 'protein_fasta',
+              'mag_size_bytes', 'mag_mtime_ns', 'protein_size_bytes', 'protein_mtime_ns')
+    return tuple(row.get(field, '') for field in fields)
+
+
+def write_manifest(path, header, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('w', newline='', encoding='utf-8') as handle:
+        writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--results-dir', required=True, type=Path,
                         help='Existing MAGFlow_results directory with 06_dastool, 09_summary and 10_bakta/10_prokka.')
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--previous-manifest', type=Path,
+                        help='Manifest successfully processed in earlier downstream batches.')
+    parser.add_argument('--new-output', type=Path,
+                        help='Write only new or changed MAG records here; requires --previous-manifest.')
     args = parser.parse_args()
+    if bool(args.previous_manifest) != bool(args.new_output):
+        die('--previous-manifest and --new-output must be supplied together.')
     root = args.results_dir.resolve()
     summaries = sorted((root / '09_summary').rglob('mag_summary.tsv'))
     if not summaries:
         die(f'No 09_summary/**/mag_summary.tsv files under {root}')
 
-    header = ['sample', 'participant_id', 'visit', 'mag_id', 'species', 'mag_fasta', 'protein_fasta']
+    header = ['sample', 'participant_id', 'visit', 'mag_id', 'species', 'mag_fasta', 'protein_fasta',
+              'mag_size_bytes', 'mag_mtime_ns', 'protein_size_bytes', 'protein_mtime_ns']
     rows, missing = [], []
     for summary in summaries:
         with summary.open(newline='', encoding='utf-8') as handle:
@@ -88,8 +120,11 @@ def main():
                     missing.append(f'{sample}/{mag}: MAG={fasta or "missing"}, protein={protein or "missing"}')
                     continue
                 species = row.get('species', '').strip() or 'NA'
+                fasta_stat, protein_stat = fasta.stat(), protein.stat()
                 rows.append([sample, stable_participant_id(participant, visit), visit, mag,
-                             species, str(fasta), str(protein)])
+                             species, str(fasta), str(protein), str(fasta_stat.st_size),
+                             str(fasta_stat.st_mtime_ns), str(protein_stat.st_size),
+                             str(protein_stat.st_mtime_ns)])
 
     if missing:
         die('Could not match all summary MAGs to published sequence/annotation files:\n  ' + '\n  '.join(missing[:30])
@@ -103,21 +138,35 @@ def main():
     if not rows:
         die('No MAG rows found in the summary tables.')
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open('w', newline='', encoding='utf-8') as handle:
-        writer = csv.writer(handle, delimiter='\t', lineterminator='\n')
-        writer.writerow(header)
-        writer.writerows(rows)
-    sample_visits = {(row[0], row[1], row[2]) for row in rows}
-    participants = {row[1] for row in rows}
-    participants_by_visit = Counter((row[2], row[1]) for row in rows)
-    print(f'Wrote {len(rows)} MAG records to {args.output}')
-    print(f'Sample visits: {len(sample_visits)}')
-    print(f'Participants: {len(participants)}')
+    full_rows = [dict(zip(header, row)) for row in rows]
+    write_manifest(args.output, header, rows)
+    print(f'Wrote complete manifest: {len(rows)} MAG records to {args.output}')
+    report_counts(full_rows, 'Current full cohort')
+
+    if args.new_output:
+        previous = {}
+        if args.previous_manifest.exists():
+            for old_row in manifest_rows(args.previous_manifest):
+                previous[record_key(old_row)] = old_row
+        pending = [row for row in full_rows
+                   if record_key(row) not in previous
+                   or record_signature(row) != record_signature(previous[record_key(row)])]
+        pending_rows = [[row.get(column, '') for column in header] for row in pending]
+        write_manifest(args.new_output, header, pending_rows)
+        print(f'Wrote pending manifest: {len(pending)} new or changed MAG records to {args.new_output}')
+        report_counts(pending, 'Pending batch')
+
+
+def report_counts(rows, label):
+    sample_visits = {(row['sample'], row['participant_id'], row['visit']) for row in rows}
+    participants = {row['participant_id'] for row in rows}
+    participants_by_visit = Counter((row['visit'], row['participant_id']) for row in rows)
+    print(f'{label} sample visits: {len(sample_visits)}')
+    print(f'{label} participants: {len(participants)}')
     print('Visit\tSample visits\tParticipants')
-    for visit in sorted({row[2] for row in rows}):
+    for visit in sorted({row['visit'] for row in rows}):
         sample_count = sum(1 for sample, participant, current_visit in sample_visits
-                           if current_visit == visit)
+                          if current_visit == visit)
         participant_count = sum(1 for current_visit, participant in participants_by_visit
                                 if current_visit == visit)
         print(f'{visit}\t{sample_count}\t{participant_count}')

@@ -20,9 +20,12 @@ def main():
     by_path, by_base = {}, {}
     with open(a.manifest, newline='') as src:
         for row in csv.reader(src, delimiter='\t'):
-            if len(row) != 4:
+            if len(row) == 5:
+                sample, visit, mag, status, path = row
+            elif len(row) == 4:
+                sample, visit, mag, path = row
+            else:
                 continue
-            sample, visit, mag, path = row
             record = {'sample': sample, 'visit': visit, 'mag_id': mag, 'path': path}
             by_path[norm(path)] = record
             by_base.setdefault(os.path.basename(path), []).append(record)
