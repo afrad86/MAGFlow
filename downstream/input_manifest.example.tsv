@@ -1,0 +1,2 @@
+sample	participant_id	visit	mag_id	species	mag_fasta	protein_fasta
+sample_001	participant_001	D1	143	Bacteroides_uniformis	/path/to/MAGFlow_results/06_dastool/sample_001_dastool/sample_001_DASTool_bins/143.fa	/path/to/MAGFlow_results/10_bakta/sample_001/143_bakta/143.faa

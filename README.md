@@ -1,5 +1,7 @@
 MAGFlow
 
+The completed MAGFlow workflow remains available at `main.nf`. Four CATI analyses that run downstream of its existing MAG/Bakta outputs are implemented as an independent entrypoint in [`downstream/README.md`](downstream/README.md); they do not add stages to or change the original workflow.
+
 MAGFlow is a modular Nextflow DSL2 pipeline for reconstructing metagenome-assembled genomes (MAGs) from Illumina paired-end metagenomic sequencing data.
 
 The pipeline is designed for scalability, reproducibility, and execution on HPC clusters using the LSF scheduler. Each analysis stage is implemented as an independent module, allowing components to be developed, tested, and replaced with minimal changes to the overall workflow.
