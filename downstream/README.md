@@ -44,22 +44,34 @@ download_eggnog_data.py -y --data_dir /path/to/eggnog-mapper/data
 
 ## Software and execution
 
-Pinned Conda environment files are in `envs/`. The `conda` profile enables those environments; `farm22` selects the LSF executor and `long` queue. Ensure the execution environment can access all input files and databases. For an HPC site with a separate resource policy, tune the per-process CPU, memory and time requests in `nextflow.config` before starting a run.
+Pinned Conda environment files are in `envs/`. The `conda` profile enables Conda; the Farm22 profile selects the LSF executor and `long` task queue, and uses pre-created tool environments under `/data/pam/ha7g/scratch/conda_envs/`. Ensure the execution environment can access all input files and databases. For an HPC site with a separate resource policy, tune the per-process CPU, memory and time requests in `nextflow.config` before starting a run.
 
 The environment pins are AMRFinderPlus 4.2.7, DIAMOND 2.1.9, eggNOG-mapper 2.1.12, FastANI 1.34, and Python 3.12 for table normalization. AMRFinderPlus software and database versions must be compatible; update the database with the same installed software release. The tools run once per MAG (and FastANI once per participant/species group), so this launches many independent tasks for the full CATI MAG collection.
 
-On Farm22, rebuild the pending manifest, then launch a batch with the wrapper below. It runs Nextflow from this standalone downstream folder, sends only pending MAGs to AMR, virulence and function, uses the complete manifest for incremental strain comparisons, and merges/checkpoints results only if Nextflow succeeds:
+On Farm22, submit the LSF job from this standalone downstream folder. The submission script rebuilds the pending manifest, runs Nextflow as an LSF driver job, sends only pending MAGs to AMR, virulence and function, uses the complete manifest for incremental strain comparisons, and merges/checkpoints results only if Nextflow succeeds. Downstream outputs are added as stages 14–18 inside the existing `MAGFlow_results`; logs and work files use downstream-specific subdirectories. Create these directories once before the first submission (the LSF stdout/stderr directory must exist before `bsub`):
 
 ```bash
 cd ~/pipelines/MAGFlow-downstream-cati/downstream
-./scripts/rebuild_cati_manifest.sh
-./scripts/run_cati_batch.sh ~/pipelines/CATI_downstream_batches/initial \
-  --amrfinder_db /path/to/amrfinderplus/data/latest \
-  --vfdb_db /path/to/vfdb/vfdb_setA \
-  --eggnog_data /path/to/eggnog-mapper/data
+mkdir -p /data/pam/ha7g/scratch/projects/metagenomics/CATI/{MAGFlow_logs/CATI_downstream,MAGFlow_work/CATI_downstream,CATI_downstream_state}
+bsub < submit_cati_downstream.sh
 ```
 
-Choose a new batch output directory for each successful or resumed batch. The merged cumulative tables are kept in `~/pipelines/CATI_downstream_state/tables/`. Each batch output directory also retains that batch's per-MAG and per-group files. If Nextflow fails, the wrapper will not merge outputs or advance the processed checkpoint; fix the issue and rerun with the same pending manifest and batch output directory.
+The script uses the installed AMRFinderPlus database, VFDB Set A DIAMOND prefix, and eggNOG data under `/data/pam/ha7g/scratch/databases/cati_downstream/`. It submits the Nextflow driver to `basement`; individual analysis tasks use the `long` queue. The driver writes scheduler output, reports, trace, timeline and DAG files to `MAGFlow_logs/CATI_downstream/`. Results are grouped by numbered analysis stage directly in `MAGFlow_results/`; each stage contains a batch-specific subdirectory. Nextflow work files are kept separately in `MAGFlow_work/CATI_downstream/`; manifests and processed checkpoints are in `CATI_downstream_state/`; cumulative merged tables are in `MAGFlow_results/18_summary/cumulative/`.
+
+The submission script reuses the same batch ID if the same pending manifest is retried after a failure, so Nextflow `-resume` can continue. It creates a new batch ID when the pending manifest changes, and prevents overlapping CATI downstream jobs. If Nextflow fails, it will not merge outputs or advance the processed checkpoint.
+
+The result layout mirrors MAGFlow's numbered result stages:
+
+```text
+MAGFlow_results/
+├── 14_amrfinderplus/<batch_id>/
+├── 15_vfdb/<batch_id>/
+├── 16_eggnog/<batch_id>/
+├── 17_fastani/<batch_id>/
+└── 18_summary/
+    ├── batches/<batch_id>/
+    └── cumulative/
+```
 
 For the CATI Farm22 paths, the repeatable shortcut is:
 
@@ -68,13 +80,13 @@ cd ~/pipelines/MAGFlow-downstream-cati/downstream
 ./scripts/rebuild_cati_manifest.sh
 ```
 
-This scans the standard CATI `MAGFlow_results` directory and writes two manifests: the complete current inventory at `~/pipelines/CATI_downstream_state/current_manifest.tsv`, and only new or changed MAGs at `~/pipelines/CATI_downstream_manifest.tsv`. It compares against `processed_manifest.tsv`, which is advanced only after a successful analysis and table merge. It reports counts for both the full cohort and pending batch. To use a different results directory, set `MAGFLOW_RESULTS_DIR`; to change the state directory, set `CATI_DOWNSTREAM_STATE_DIR`; to write the pending manifest elsewhere, pass its path as the first argument.
+This scans `/data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_results` and writes the complete inventory to `CATI_downstream_state/current_manifest.tsv` and only new or changed MAGs to `CATI_downstream_manifest.tsv`, both under the CATI directory. It compares against `processed_manifest.tsv`, which advances only after successful analysis and table merging. To use a different results directory, set `MAGFLOW_RESULTS_DIR`; to change the state or pending manifest path, set `CATI_DOWNSTREAM_STATE_DIR` or `CATI_PENDING_MANIFEST`.
 
 ### Adding visits or participants later
 
 The manifest builder scans all `09_summary/**/mag_summary.tsv` files under the supplied results directory; it does not assume a fixed number of samples, participants, or visit labels. On the first build, every MAG is pending, so the initial downstream analysis covers the current cohort once. After a batch succeeds and is finalized, the processed checkpoint records the complete inventory. Later builds put only new or changed `(sample, mag_id)` records in the pending manifest; file size and modification time are checked so updated inputs are reprocessed without hashing the full sequence collection. New M6, M12, M24 visits or new participants therefore enter the pending batch automatically.
 
-AMR, VFDB and eggNOG receive only pending MAG records. FastANI receives the complete inventory for groups containing pending MAGs, but compares only new-to-old, old-to-new, or new-to-new pairs; old-to-old pairs are not recalculated. After success, the finalizer replaces previous rows for affected MAGs, appends the batch rows, and preserves unrelated prior rows in the cumulative tables. Use a new batch `--outdir` for each run and the same persistent `--work_dir` with `-resume`. If database snapshots or analysis parameters change, start a separate state/output series so cumulative results do not mix incompatible runs.
+AMR, VFDB and eggNOG receive only pending MAG records. FastANI receives the complete inventory for groups containing pending MAGs, but compares only new-to-old, old-to-new, or new-to-new pairs; old-to-old pairs are not recalculated. After success, the finalizer replaces previous rows for affected MAGs, appends the batch rows, and preserves unrelated prior rows in the cumulative tables. The submission script creates a unique batch ID and keeps the same persistent work directory with `-resume`. If database snapshots or analysis parameters change, start a separate state/output series so cumulative results do not mix incompatible runs.
 
 Keep the work directory because it contains Nextflow intermediates (including eggNOG search files) required for resume; it may be much larger than the compact published tables. If the pending manifest has zero records, skip Nextflow and finalization. Do not run the original `main.nf` for this task.
 
@@ -93,7 +105,7 @@ AMRFinderPlus uses its curated thresholds by default. Results should not be inte
 
 ## Outputs
 
-Each batch output directory retains that batch's per-MAG and per-group normalized tables under `per_mag/` and `per_group/`. The Farm22 runner merges four cumulative tab-separated cohort tables under `~/pipelines/CATI_downstream_state/tables/`:
+Each batch has its own tool outputs under `MAGFlow_results/14_amrfinderplus/`, `15_vfdb/`, `16_eggnog/`, and `17_fastani/`; normalized batch tables are under `MAGFlow_results/18_summary/batches/<batch_id>/`. The Farm22 runner merges four cumulative tab-separated cohort tables under `MAGFlow_results/18_summary/cumulative/`:
 
 * `amr_features.tsv` — sample, participant, visit, MAG, determinant/class, method, identity/coverage and coordinates/evidence fields.
 * `virulence_features.tsv` — sample, participant, visit, MAG, protein query, VFDB subject, identity, query coverage, E-value and score.

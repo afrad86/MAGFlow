@@ -1,6 +1,6 @@
 process STRAIN_FASTANI {
     tag "${participant}:${species}"
-    publishDir "${params.outdir}/per_group/strain", mode: 'copy', overwrite: false
+    publishDir "${params.outdir}/17_fastani/${params.batch_id}", mode: 'copy', overwrite: false
 
     input:
     tuple val(participant), val(species), val(records), path(genomes, stageAs: '?/*')

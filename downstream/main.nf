@@ -9,7 +9,8 @@ include { COLLATE_FEATURES } from './modules/collate'
 workflow {
     if (!params.input) error 'Set --input to the pending (new or changed MAGs) manifest.'
     if (!params.all_input) error 'Set --all_input to the complete current MAG manifest for longitudinal strain comparisons.'
-    if (!params.outdir) error 'Set --outdir to a new downstream-results directory.'
+    if (!params.outdir) error 'Set --outdir to the CATI downstream results root.'
+    if (!params.batch_id) error 'Set --batch_id to a unique identifier for this downstream batch.'
     if (!params.amrfinder_db || !file(params.amrfinder_db).exists()) {
         error 'Set --amrfinder_db to a prepared AMRFinderPlus database directory.'
     }

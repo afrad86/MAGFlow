@@ -1,6 +1,6 @@
 process EGGNOG_ANNOTATE {
     tag "${sample}:${mag}"
-    publishDir "${params.outdir}/per_mag/function", mode: 'copy', overwrite: false
+    publishDir "${params.outdir}/16_eggnog/${params.batch_id}", mode: 'copy', overwrite: false
 
     input:
     tuple val(sample), val(participant), val(visit), val(mag), val(species), path(genome), path(proteins)

@@ -1,6 +1,6 @@
 process VFDB_SEARCH {
     tag "${sample}:${mag}"
-    publishDir "${params.outdir}/per_mag/virulence", mode: 'copy', overwrite: false
+    publishDir "${params.outdir}/15_vfdb/${params.batch_id}", mode: 'copy', overwrite: false
 
     input:
     tuple val(sample), val(participant), val(visit), val(mag), val(species), path(genome), path(proteins)

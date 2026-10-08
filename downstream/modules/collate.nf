@@ -1,6 +1,6 @@
 process COLLATE_FEATURES {
     tag 'cohort feature tables'
-    publishDir "${params.outdir}/tables", mode: 'copy', overwrite: false
+    publishDir "${params.outdir}/18_summary/batches/${params.batch_id}", mode: 'copy', overwrite: false
 
     input:
     path amrFiles

@@ -1,6 +1,6 @@
 process AMRFINDER {
     tag "${sample}:${mag}"
-    publishDir "${params.outdir}/per_mag/amr", mode: 'copy', overwrite: false
+    publishDir "${params.outdir}/14_amrfinderplus/${params.batch_id}", mode: 'copy', overwrite: false
 
     input:
     tuple val(sample), val(participant), val(visit), val(mag), val(species), path(genome)

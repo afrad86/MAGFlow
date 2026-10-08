@@ -2,15 +2,18 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-state_dir="${CATI_DOWNSTREAM_STATE_DIR:-${HOME}/pipelines/CATI_downstream_state}"
-batch_dir="${1:?Usage: finalize_cati_batch.sh BATCH_OUTDIR [PENDING_MANIFEST] [FULL_MANIFEST]}"
-pending_manifest="${2:-${HOME}/pipelines/CATI_downstream_manifest.tsv}"
+CATI_ROOT="${CATI_ROOT:-/data/pam/ha7g/scratch/projects/metagenomics/CATI}"
+state_dir="${CATI_DOWNSTREAM_STATE_DIR:-${CATI_ROOT}/CATI_downstream_state}"
+batch_id="${1:?Usage: finalize_cati_batch.sh BATCH_ID [PENDING_MANIFEST] [FULL_MANIFEST]}"
+pending_manifest="${2:-${CATI_PENDING_MANIFEST:-${CATI_ROOT}/CATI_downstream_manifest.tsv}}"
 full_manifest="${3:-${state_dir}/current_manifest.tsv}"
-tables_dir="${state_dir}/tables"
+results_dir="${CATI_DOWNSTREAM_RESULTS_DIR:-${MAGFLOW_RESULTS_DIR:-${CATI_ROOT}/MAGFlow_results}}"
+batch_tables_dir="${results_dir}/18_summary/batches/${batch_id}"
+tables_dir="${CATI_DOWNSTREAM_TABLES_DIR:-${results_dir}/18_summary/cumulative}"
 
 python3 "${script_dir}/merge_incremental_tables.py" \
   --previous-dir "${tables_dir}" \
-  --batch-dir "${batch_dir%/}/tables" \
+  --batch-dir "${batch_tables_dir}" \
   --pending-manifest "${pending_manifest}" \
   --output-dir "${tables_dir}"
 
