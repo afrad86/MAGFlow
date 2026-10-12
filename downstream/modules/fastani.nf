@@ -23,33 +23,10 @@ process STRAIN_FASTANI {
     """
     set -euo pipefail
     python3 -c 'import base64,sys;sys.stdout.buffer.write(base64.b64decode(sys.argv[1]))' '${rowsB64}' > genome_manifest.tsv
-    awk -F '\t' '\$4 == "NEW" {print \$5}' genome_manifest.tsv > new_genomes.txt
-    awk -F '\t' '\$4 == "OLD" {print \$5}' genome_manifest.tsv > old_genomes.txt
-    cut -f5 genome_manifest.tsv > all_genomes.txt
     # FastANI uses 3 kb fragments by default and can crash on an empty query
     # list or FASTAs without any contig long enough to yield a fragment.
-    python3 - <<'PY'
-    for source, target in (("new_genomes.txt", "new_genomes.eligible.txt"),
-                           ("old_genomes.txt", "old_genomes.eligible.txt"),
-                           ("all_genomes.txt", "all_genomes.eligible.txt")):
-        with open(source) as src, open(target, "w") as dst:
-            for raw_path in src:
-                path = raw_path.strip()
-                if not path:
-                    continue
-                max_contig = 0
-                current = 0
-                with open(path) as fasta:
-                    for line in fasta:
-                        if line.startswith(">"):
-                            max_contig = max(max_contig, current)
-                            current = 0
-                        else:
-                            current += len(line.strip())
-                    max_contig = max(max_contig, current)
-                if max_contig >= 3000:
-                    dst.write(path + "\n")
-    PY
+    python3 '${projectDir}/scripts/filter_fastani_genomes.py' --manifest genome_manifest.tsv \
+      --new new_genomes.eligible.txt --old old_genomes.eligible.txt --all all_genomes.eligible.txt
     if [ -s new_genomes.eligible.txt ] && [ -s all_genomes.eligible.txt ]; then
       fastANI --ql new_genomes.eligible.txt --rl all_genomes.eligible.txt --output fastani.new.raw.tsv --threads ${task.cpus}
     else
