@@ -13,6 +13,8 @@ process AMRFINDER {
     def organismArg = params.amrfinder_organism ? "--organism '${params.amrfinder_organism}'" : ''
     """
     set -euo pipefail
+    # Database snapshot fingerprint participates in the Nextflow task hash.
+    echo '${params.amrfinder_db_fingerprint}' >/dev/null
     amrfinder --nucleotide '${genome}' --database '${database}' \\
       --threads ${task.cpus} ${organismArg} --output amrfinder.raw.tsv
     python3 '${projectDir}/scripts/normalize_amr.py' \\

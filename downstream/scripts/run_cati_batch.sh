@@ -9,6 +9,10 @@ pending_manifest="${CATI_PENDING_MANIFEST:-${CATI_ROOT}/CATI_downstream_manifest
 full_manifest="${state_dir}/current_manifest.tsv"
 work_dir="${CATI_DOWNSTREAM_WORK_DIR:-${CATI_ROOT}/CATI_downstream_work}"
 results_dir="${CATI_DOWNSTREAM_RESULTS_DIR:-${MAGFLOW_RESULTS_DIR:-${CATI_ROOT}/MAGFlow_results}}"
+log_dir="${CATI_DOWNSTREAM_LOG_DIR:-${CATI_ROOT}/MAGFlow_logs/CATI_downstream}"
+run_id="${CATI_DOWNSTREAM_RUN_ID:-$(date +%Y%m%d_%H%M%S)}"
+nextflow_log="${log_dir}/nextflow_${run_id}.log"
+nextflow_bin="${HOME}/software/nextflow"
 batch_id="${1:?Usage: run_cati_batch.sh BATCH_ID --amrfinder_db PATH --vfdb_db PREFIX --eggnog_data DIR}"
 shift
 
@@ -24,9 +28,14 @@ if ! sed -n '2p' "${pending_manifest}" | grep -q .; then
   exit 0
 fi
 
-mkdir -p "${results_dir}"
+mkdir -p "${results_dir}" "${log_dir}" "${work_dir}"
+cd "${downstream_dir}"
+echo "Nextflow work directory: ${work_dir}"
+echo "Nextflow engine log   : ${nextflow_log}"
+echo "Nextflow task cache   : ${downstream_dir}/.nextflow/cache"
+echo "Resume mode           : enabled (-resume)"
 
-nextflow run "${downstream_dir}/main.nf" \
+"${nextflow_bin}" -log "${nextflow_log}" run "${downstream_dir}/main.nf" \
   -profile farm22,conda \
   --input "${pending_manifest}" \
   --all_input "${full_manifest}" \

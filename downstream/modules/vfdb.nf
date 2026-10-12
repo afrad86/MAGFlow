@@ -15,6 +15,8 @@ process VFDB_SEARCH {
     script:
     """
     set -euo pipefail
+    # Database snapshot fingerprint participates in the Nextflow task hash.
+    echo '${params.vfdb_db_fingerprint}' >/dev/null
     diamond blastp --query '${proteins}' --db '${database}' \\
       --out vfdb.raw.tsv --outfmt 6 qseqid sseqid pident length qlen slen evalue bitscore stitle \\
       --evalue '${evalue}' --id ${minIdentity} --query-cover ${minQueryCover} \\

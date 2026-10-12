@@ -18,8 +18,12 @@ module load cellgen/java/23.0.2
 module load ISG/conda
 export PATH="${HOME}/software:${PATH}"
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-downstream_dir="${script_dir}"
+downstream_dir="${CATI_DOWNSTREAM_DIR:-$(pwd -P)}"
+script_dir="${downstream_dir}"
+if [[ ! -f "${downstream_dir}/main.nf" || ! -f "${script_dir}/scripts/database_fingerprint.sh" ]]; then
+    echo "ERROR: Run bsub from the downstream directory, or set CATI_DOWNSTREAM_DIR." >&2
+    exit 2
+fi
 source "${script_dir}/scripts/database_fingerprint.sh"
 CATI_ROOT="${CATI_ROOT:-/data/pam/ha7g/scratch/projects/metagenomics/CATI}"
 MAGFLOW_RESULTS_DIR="${MAGFLOW_RESULTS_DIR:-${CATI_ROOT}/MAGFlow_results}"

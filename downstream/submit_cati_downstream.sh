@@ -19,8 +19,13 @@ module load cellgen/java/23.0.2
 module load ISG/conda
 export PATH="${HOME}/software:${PATH}"
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-downstream_dir="$(cd -- "${script_dir}" && pwd)"
+downstream_dir="${CATI_DOWNSTREAM_DIR:-$(pwd -P)}"
+script_dir="${downstream_dir}"
+if [[ ! -f "${downstream_dir}/main.nf" || ! -f "${script_dir}/scripts/database_fingerprint.sh" ]]; then
+    echo "ERROR: Run bsub from the downstream directory, or set CATI_DOWNSTREAM_DIR." >&2
+    exit 2
+fi
+source "${script_dir}/scripts/database_fingerprint.sh"
 CATI_ROOT="${CATI_ROOT:-/data/pam/ha7g/scratch/projects/metagenomics/CATI}"
 export CATI_ROOT
 export MAGFLOW_RESULTS_DIR="${MAGFLOW_RESULTS_DIR:-${CATI_ROOT}/MAGFlow_results}"
@@ -34,11 +39,16 @@ AMRFINDER_DB="${AMRFINDER_DB:-/data/pam/ha7g/scratch/databases/cati_downstream/a
 VFDB_DB="${VFDB_DB:-/data/pam/ha7g/scratch/databases/cati_downstream/vfdb/VFDB_setA_pro}"
 EGGNOG_DATA="${EGGNOG_DATA:-/data/pam/ha7g/scratch/databases/cati_downstream/eggnog}"
 
+AMRFINDER_DB_FINGERPRINT="$(fingerprint_path "${AMRFINDER_DB}")"
+VFDB_DB_FINGERPRINT="$(fingerprint_path "${VFDB_DB}.dmnd")"
+EGGNOG_DB_FINGERPRINT="$(fingerprint_path "${EGGNOG_DATA}")"
+
 mkdir -p "${CATI_DOWNSTREAM_LOG_DIR}" "${CATI_DOWNSTREAM_RESULTS_DIR}" \
     "${CATI_DOWNSTREAM_WORK_DIR}" "${CATI_DOWNSTREAM_STATE_DIR}"
 cd "${downstream_dir}"
 
 RUN_ID="${LSB_JOBID:-$(date +%Y%m%d_%H%M%S)}"
+export CATI_DOWNSTREAM_RUN_ID="${RUN_ID}"
 echo "=================================================="
 echo "CATI downstream started : $(date)"
 echo "Run ID                  : ${RUN_ID}"
@@ -48,6 +58,9 @@ echo "MAGFlow inputs           : ${MAGFLOW_RESULTS_DIR}"
 echo "Results root             : ${CATI_DOWNSTREAM_RESULTS_DIR}"
 echo "Work directory           : ${CATI_DOWNSTREAM_WORK_DIR}"
 echo "State directory          : ${CATI_DOWNSTREAM_STATE_DIR}"
+echo "Nextflow engine log      : ${CATI_DOWNSTREAM_LOG_DIR}/nextflow_${RUN_ID}.log"
+echo "Nextflow task cache      : ${downstream_dir}/.nextflow/cache"
+echo "Resume                   : enabled (-resume)"
 module list
 echo "Nextflow                 : $(nextflow -version | head -1)"
 java -version 2>&1 | head -1
@@ -75,7 +88,12 @@ fi
 # Retain the same output directory on a failed rerun with the same manifest.
 # After successful finalization, the active marker is removed; a later batch
 # gets its own timestamped output directory.
-manifest_hash="$(sha256sum "${CATI_PENDING_MANIFEST}" | awk '{print $1}')"
+pending_hash="$(sha256sum "${CATI_PENDING_MANIFEST}" | awk '{print $1}')"
+manifest_hash="$(
+    printf '%s\n' "${pending_hash}" "${AMRFINDER_DB_FINGERPRINT}" \
+        "${VFDB_DB_FINGERPRINT}" "${EGGNOG_DB_FINGERPRINT}" |
+        sha256sum | awk '{print $1}'
+)"
 active_batch="${CATI_DOWNSTREAM_STATE_DIR}/active_batch.tsv"
 batch_id=""
 if [[ -s "${active_batch}" ]]; then
@@ -96,10 +114,27 @@ if [[ -z "${batch_id}" ]]; then
     mv "${active_batch}.tmp" "${active_batch}"
 fi
 
+# Keep a permanent link from this LSF driver job to its downstream batch so
+# the status dashboard can identify completed runs after active_batch is removed.
+printf '%s\t%s\n' "${RUN_ID}" "${batch_id}" > "${CATI_DOWNSTREAM_STATE_DIR}/run_lineage_${RUN_ID}.tsv"
+batch_state_dir="${CATI_DOWNSTREAM_STATE_DIR}/batches/${batch_id}"
+mkdir -p "${batch_state_dir}"
+cp "${CATI_PENDING_MANIFEST}" "${batch_state_dir}/pending_manifest.tsv"
+cp "${CATI_DOWNSTREAM_STATE_DIR}/current_manifest.tsv" "${batch_state_dir}/current_manifest.tsv"
+{
+    printf 'database\tpath\tfingerprint\n'
+    printf 'AMRFinderPlus\t%s\t%s\n' "$(readlink -f -- "${AMRFINDER_DB}")" "${AMRFINDER_DB_FINGERPRINT}"
+    printf 'VFDB_DIAMOND\t%s\t%s\n' "$(readlink -f -- "${VFDB_DB}.dmnd")" "${VFDB_DB_FINGERPRINT}"
+    printf 'eggNOG-mapper\t%s\t%s\n' "$(readlink -f -- "${EGGNOG_DATA}")" "${EGGNOG_DB_FINGERPRINT}"
+} > "${batch_state_dir}/database_fingerprints.tsv"
+
 "${script_dir}/scripts/run_cati_batch.sh" "${batch_id}" \
     --amrfinder_db "${AMRFINDER_DB}" \
+    --amrfinder_db_fingerprint "${AMRFINDER_DB_FINGERPRINT}" \
     --vfdb_db "${VFDB_DB}" \
+    --vfdb_db_fingerprint "${VFDB_DB_FINGERPRINT}" \
     --eggnog_data "${EGGNOG_DATA}" \
+    --eggnog_db_fingerprint "${EGGNOG_DB_FINGERPRINT}" \
     --trace_file "${CATI_DOWNSTREAM_LOG_DIR}/trace_${RUN_ID}.txt" \
     -with-report "${CATI_DOWNSTREAM_LOG_DIR}/report_${RUN_ID}.html" \
     -with-timeline "${CATI_DOWNSTREAM_LOG_DIR}/timeline_${RUN_ID}.html" \

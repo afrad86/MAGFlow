@@ -1,0 +1,286 @@
+#!/usr/bin/env python3
+"""Show live progress for the most recent CATI downstream Nextflow run."""
+
+import argparse
+import csv
+import os
+import re
+import sys
+import textwrap
+import time
+from collections import Counter
+from pathlib import Path
+
+
+DEFAULT_ROOT = Path("/data/pam/ha7g/scratch/projects/metagenomics/CATI")
+PROCESS_ORDER = [
+    "AMRFINDER", "VFDB_SEARCH", "EGGNOG_ANNOTATE", "STRAIN_FASTANI",
+]
+FINISHED = {"COMPLETED", "CACHED"}
+
+
+def read_trace(path):
+    with path.open(newline="", encoding="utf-8", errors="replace") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        if not reader.fieldnames or not {"name", "status"}.issubset(reader.fieldnames):
+            raise ValueError(f"Not a Nextflow trace file: {path}")
+        return list(reader)
+
+
+def latest_trace(log_dir):
+    traces = list(log_dir.glob("trace_*.txt"))
+    return max(traces, key=lambda p: p.stat().st_mtime) if traces else None
+
+
+def trace_job_id(trace_path):
+    # Farm22 run IDs are LSF job IDs; timestamp-based IDs are also supported.
+    match = re.fullmatch(r"trace_(\d+)\.txt", trace_path.name)
+    return match.group(1) if match else None
+
+
+def read_manifest(path):
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            return list(csv.DictReader(handle, delimiter="\t"))
+    except OSError:
+        return []
+
+
+def process_name(row):
+    return row.get("name", "").split("(", 1)[0].strip().split(":")[-1].strip()
+
+
+def task_sample(row):
+    """Extract the sample part from Nextflow's sample:MAG task tag."""
+    if process_name(row) not in {"AMRFINDER", "VFDB_SEARCH", "EGGNOG_ANNOTATE"}:
+        return None
+    name = row.get("name", "")
+    match = re.search(r"\(([^()]*)\)", name)
+    if not match:
+        return None
+    tag = match.group(1).strip()
+    if ":" not in tag:
+        return None
+    sample = tag.split(":", 1)[0].strip()
+    return sample or None
+
+
+def task_tag(row):
+    match = re.search(r"\(([^()]*)\)", row.get("name", ""))
+    return match.group(1).strip() if match else ""
+
+
+def attempt_number(row):
+    try:
+        return int(row.get("attempt") or 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def sample_progress(rows, process, sample_ids, pending_rows):
+    """Count finished/active/failed sample visits, collapsing MAG tasks by sample."""
+    sample_statuses = {}
+    expected_counts = Counter()
+    selected = [row for row in rows if process_name(row) == process]
+    if process in {"AMRFINDER", "VFDB_SEARCH", "EGGNOG_ANNOTATE"}:
+        expected_counts.update(row.get("sample", "") for row in pending_rows if row.get("sample"))
+        mag_statuses = {}
+        for row in selected:
+            tag = task_tag(row)
+            sample, sep, mag = tag.partition(":")
+            if sep:
+                current = mag_statuses.setdefault(sample.strip(), {}).get(mag.strip())
+                if current is None or attempt_number(row) >= current[0]:
+                    mag_statuses[sample.strip()][mag.strip()] = (
+                        attempt_number(row), row.get("status", "UNKNOWN").upper())
+        for sample, mags in mag_statuses.items():
+            sample_statuses[sample] = [status for _, status in mags.values()]
+    elif process == "STRAIN_FASTANI":
+        group_samples = {}
+        for row in pending_rows:
+            group = (row.get("participant_id", ""), row.get("species", ""))
+            if row.get("sample") and row.get("species") not in {"", "NA", "s__"}:
+                group_samples.setdefault(group, set()).add(row["sample"])
+        expected_groups = {sample: set() for sample in sample_ids}
+        for group, samples in group_samples.items():
+            for sample in samples:
+                expected_groups.setdefault(sample, set()).add(group)
+        expected_counts.update({sample: len(groups) for sample, groups in expected_groups.items()})
+        group_statuses = {}
+        for row in selected:
+            tag = task_tag(row)
+            participant, sep, species = tag.partition(":")
+            if sep:
+                group = (participant.strip(), species.strip())
+                current = group_statuses.get(group)
+                if current is None or attempt_number(row) >= current[0]:
+                    group_statuses[group] = (attempt_number(row), row.get("status", "UNKNOWN").upper())
+        for group, (_, status) in group_statuses.items():
+            for sample in group_samples.get(group, set()):
+                sample_statuses.setdefault(sample, []).append(status)
+    elif process == "COLLATE_FEATURES":
+        expected_counts.update({sample: 1 for sample in sample_ids})
+        for sample in sample_ids:
+            sample_statuses[sample] = [row.get("status", "UNKNOWN").upper() for row in selected]
+
+    finished, failed, aborted = set(), set(), set()
+    for sample in sample_ids:
+        sample_states = sample_statuses.get(sample, [])
+        expected = expected_counts.get(sample, len(sample_states))
+        if process == "STRAIN_FASTANI" and expected == 0:
+            # MAGs without an assigned species are intentionally skipped by ANI.
+            finished.add(sample)
+        if any(state == "FAILED" for state in sample_states):
+            finished.discard(sample)
+            failed.add(sample)
+        elif any(state in {"ABORTED", "CANCELLED"} for state in sample_states):
+            finished.discard(sample)
+            aborted.add(sample)
+        elif expected > 0 and len(sample_states) >= expected and all(state in FINISHED for state in sample_states):
+            finished.add(sample)
+    # Unsubmitted and queued samples remain in the in-progress count. This
+    # makes completed + running equal the batch sample total unless a sample
+    # is explicitly listed as failed or aborted.
+    active = set(sample_ids) - finished - failed - aborted
+    return {
+        "finished": finished,
+        "active": active,
+        "failed": failed,
+        "aborted": aborted,
+        "total": len(sample_ids),
+    }
+
+
+def print_dashboard(root, state_dir, trace, rows):
+    job_id = trace_job_id(trace)
+    batch_file = state_dir / "active_batch.tsv"
+    batch_id = "not recorded (job may have finalized)"
+    if batch_file.exists():
+        try:
+            with batch_file.open(encoding="utf-8") as handle:
+                fields = handle.readline().rstrip("\n").split("\t")
+                if len(fields) > 1:
+                    batch_id = fields[1]
+        except OSError:
+            pass
+    if job_id:
+        lineage_file = state_dir / f"run_lineage_{job_id}.tsv"
+        if lineage_file.exists():
+            try:
+                with lineage_file.open(encoding="utf-8") as handle:
+                    fields = handle.readline().rstrip("\n").split("\t")
+                    if len(fields) > 1:
+                        batch_id = fields[1]
+            except OSError:
+                pass
+
+    snapshot_dir = state_dir / "batches" / batch_id
+    pending_rows = read_manifest(snapshot_dir / "pending_manifest.tsv")
+    if not pending_rows:
+        pending_rows = read_manifest(root / "CATI_downstream_manifest.tsv")
+    sample_ids = {row.get("sample", "") for row in pending_rows if row.get("sample")}
+    if not sample_ids:
+        sample_ids = {task_sample(row) for row in rows if task_sample(row)}
+    sample_ids.discard("")
+
+    progress = {
+        process: sample_progress(rows, process, sample_ids, pending_rows)
+        for process in PROCESS_ORDER
+    }
+
+    print("=" * 60)
+    print("                 CATI DOWNSTREAM STATUS")
+    print("=" * 60)
+    print(f"Run lineage : {batch_id}")
+    print(f"Samples     : {len(sample_ids)}")
+    print(f"Tasks       : {len(rows)}")
+    print()
+    print("Completed")
+    print("-" * 60)
+    any_completed = False
+    for process in PROCESS_ORDER:
+        completed = len(progress[process]["finished"])
+        if completed:
+            any_completed = True
+            print(f"✔ {process:<25} {completed}/{len(sample_ids)}")
+    if not any_completed:
+        print("None")
+
+    print("\n" + "-" * 60)
+    print("Running")
+    print("-" * 60)
+    any_running = False
+    for process in PROCESS_ORDER:
+        active = len(progress[process]["active"])
+        if active:
+            any_running = True
+            print(f"◷ {process:<25} {active}/{len(sample_ids)}")
+    if not any_running:
+        print("None")
+
+    for section, key in (("Failed", "failed"), ("Aborted", "aborted")):
+        print("\n" + "-" * 60)
+        print(section)
+        print("-" * 60)
+        any_state = False
+        for process in PROCESS_ORDER:
+            affected = sorted(progress[process][key])
+            if affected:
+                any_state = True
+                print(f"{process}:")
+                print(textwrap.fill(", ".join(affected), width=58,
+                                    initial_indent="  ", subsequent_indent="  "))
+        if not any_state:
+            print("None")
+
+    running_job_ids = {row.get("native_id") for row in rows
+                       if row.get("native_id") and row.get("status", "").upper() == "RUNNING"}
+    pending_job_ids = {row.get("native_id") for row in rows
+                       if row.get("native_id") and row.get("status", "").upper() in {"SUBMITTED", "NEW"}}
+    print("\n" + "-" * 60)
+    print("LSF Jobs")
+    print("-" * 60)
+    print(f"RUN  : {len(running_job_ids)}")
+    print(f"PEND : {len(pending_job_ids)}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path(os.environ.get("CATI_ROOT", DEFAULT_ROOT)))
+    parser.add_argument("--logs-dir", type=Path)
+    parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--watch", type=int, metavar="SECONDS", help="refresh repeatedly at this interval")
+    parser.add_argument("--trace", type=Path, help="inspect a specific Nextflow trace file")
+    args = parser.parse_args()
+    if args.watch is not None and args.watch < 1:
+        parser.error("--watch must be at least 1 second")
+
+    logs_dir = args.logs_dir or args.root / "MAGFlow_logs" / "CATI_downstream"
+    state_dir = args.state_dir or args.root / "CATI_downstream_state"
+    try:
+        while True:
+            trace = args.trace or latest_trace(logs_dir)
+            if trace is None:
+                if args.watch:
+                    print("\033[2J\033[H", end="")
+                    print(f"Waiting for a downstream Nextflow trace in {logs_dir}...")
+                    time.sleep(args.watch)
+                    continue
+                print(f"No downstream trace found in {logs_dir}.")
+                print("Submit the downstream job first; its trace will appear while Nextflow runs.")
+                return 1
+            rows = read_trace(trace)
+            if args.watch:
+                print("\033[2J\033[H", end="")
+            print_dashboard(args.root, state_dir, trace, rows)
+            if not args.watch:
+                break
+            time.sleep(args.watch)
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
