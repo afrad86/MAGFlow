@@ -151,7 +151,7 @@ def sample_progress(rows, process, sample_ids, pending_rows):
     }
 
 
-def print_dashboard(root, state_dir, trace, rows):
+def print_dashboard(root, state_dir, trace, rows, manifest_override=None):
     job_id = trace_job_id(trace)
     batch_file = state_dir / "active_batch.tsv"
     batch_id = "not recorded (job may have finalized)"
@@ -175,9 +175,11 @@ def print_dashboard(root, state_dir, trace, rows):
                 pass
 
     snapshot_dir = state_dir / "batches" / batch_id
-    pending_rows = read_manifest(snapshot_dir / "pending_manifest.tsv")
-    if not pending_rows:
-        pending_rows = read_manifest(root / "CATI_downstream_manifest.tsv")
+    pending_rows = read_manifest(manifest_override) if manifest_override else []
+    if not manifest_override:
+        pending_rows = read_manifest(snapshot_dir / "pending_manifest.tsv")
+        if not pending_rows:
+            pending_rows = read_manifest(root / "CATI_downstream_manifest.tsv")
     sample_ids = {row.get("sample", "") for row in pending_rows if row.get("sample")}
     if not sample_ids:
         sample_ids = {task_sample(row) for row in rows if task_sample(row)}
@@ -251,6 +253,8 @@ def main():
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--watch", type=int, metavar="SECONDS", help="refresh repeatedly at this interval")
     parser.add_argument("--trace", type=Path, help="inspect a specific Nextflow trace file")
+    parser.add_argument("--manifest", type=Path,
+                        help="pending manifest for this run (useful for smoke-test runs)")
     args = parser.parse_args()
     if args.watch is not None and args.watch < 1:
         parser.error("--watch must be at least 1 second")
@@ -272,7 +276,7 @@ def main():
             rows = read_trace(trace)
             if args.watch:
                 print("\033[2J\033[H", end="")
-            print_dashboard(args.root, state_dir, trace, rows)
+            print_dashboard(args.root, state_dir, trace, rows, args.manifest)
             if not args.watch:
                 break
             time.sleep(args.watch)

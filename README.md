@@ -161,7 +161,7 @@ The manifest builder scans `09_summary/**/mag_summary.tsv`, matches MAG FASTAs i
 
 Participant IDs must stay stable across visits. The builder removes a final `_<visit>` suffix from a summary `participant_id` when present; review that the resulting IDs represent the same person across visits. MAGs without a species assignment still receive AMR, VFDB, and eggNOG analyses, but are omitted from FastANI comparisons.
 
-The production Farm22 launcher rebuilds both the complete current inventory and a pending-only manifest before each batch. It compares each `(sample, mag_id)` to the processed checkpoint using input file size and modification time. AMRFinderPlus, VFDB, and eggNOG process only new or changed MAG records. FastANI reads all genomes in participant/species groups containing pending MAGs, but calculates only pairs involving at least one pending MAG; old-to-old pairs are not repeated. After a successful run, the finalizer updates cumulative tables and advances the processed checkpoint. A failed run does neither. The workflow assumes MAGFlow results are append-only; removed MAGs are not automatically pruned from cumulative results.
+The production Farm22 launcher rebuilds both the complete current inventory and a pending-only manifest before each batch. It compares each `(sample, mag_id)` to the processed checkpoint using input file size and modification time. AMRFinderPlus, VFDB, and eggNOG process only new or changed MAG records. FastANI reads all genomes in participant/species groups containing pending MAGs, but calculates only pairs involving at least one pending MAG; old-to-old pairs are not repeated. An individual AMRFinderPlus, VFDB, eggNOG, or FastANI task failure is ignored by Nextflow so the other analyses continue and partial per-tool outputs can be collated. The launcher checks the completed trace: if any task failed, it does not merge cumulative tables or advance the processed checkpoint. Resubmitting the same batch with `-resume` retries failed tasks and reuses successful cached tasks. Only a failure-free run is finalized. The workflow assumes MAGFlow results are append-only; removed MAGs are not automatically pruned from cumulative results.
 
 The manifest scan does not assume a fixed number of participants, samples, or visit labels. New visits and participants enter the downstream inventory when their MAGFlow summaries and MAG inputs are present. The **current core `main.nf`** still validates visits against D1, M1, M2, M4, and M6, so add future labels there before running the core workflow on M12 or M24 data.
 
@@ -240,7 +240,17 @@ python3 scripts/cati_downstream_status.py
 python3 scripts/cati_downstream_status.py --watch 30
 ```
 
-The dashboard is read-only. It reads the latest downstream trace and reports sample-visit progress, failed/aborted samples, and LSF RUN/PEND counts. The launchers also write per-run Nextflow logs, trace, report, timeline, and DAG under the corresponding downstream log directory.
+The dashboard is read-only. It reads the latest downstream trace and reports sample-visit progress, failed/aborted samples, and LSF RUN/PEND counts. For a smoke run, pass its explicit manifest so expected MAGs are counted correctly:
+
+```bash
+python3 scripts/cati_downstream_status.py \
+  --root /data/pam/ha7g/scratch/projects/metagenomics/CATI/CATI_downstream_smoke_test \
+  --state-dir /data/pam/ha7g/scratch/projects/metagenomics/CATI/CATI_downstream_smoke_test/state \
+  --trace /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream_smoke_test/trace_JOBID.txt \
+  --manifest /data/pam/ha7g/scratch/projects/metagenomics/CATI/CATI_downstream_smoke_test/state/smoke_manifest.tsv
+```
+
+The launchers also write per-run Nextflow logs, trace, report, timeline, and DAG under the corresponding downstream log directory.
 
 Key parameters are set in `downstream/nextflow.config` or passed to the standalone workflow:
 

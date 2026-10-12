@@ -74,6 +74,11 @@ workflow {
         params.vfdb_min_identity, params.vfdb_min_query_cover, params.vfdb_evalue)
     def eggnog = EGGNOG_ANNOTATE(manifest, params.eggnog_data,
         params.eggnog_sensitivity, params.eggnog_options)
+    // Header-only sentinels let collation run when every task in a tool branch
+    // fails under errorStrategy 'ignore'. They also keep empty-result tables valid.
+    def empty_amr_table = Channel.fromPath("${projectDir}/assets/empty_amr.tsv", checkIfExists: true)
+    def empty_vfdb_table = Channel.fromPath("${projectDir}/assets/empty_vfdb.tsv", checkIfExists: true)
+    def empty_eggnog_table = Channel.fromPath("${projectDir}/assets/empty_eggnog.tsv", checkIfExists: true)
 
     // Annotate only pending MAGs. For strain comparison, use all MAGs in the
     // participant/species group but run FastANI only for pairs involving at
@@ -105,7 +110,9 @@ workflow {
     def empty_strain_table = Channel.fromPath("${projectDir}/assets/empty_fastani.tsv", checkIfExists: true)
 
     COLLATE_FEATURES(
-        amr.table.collect(), vfdb.table.collect(),
-        eggnog.table.collect(), strain.table.concat(empty_strain_table).collect()
+        amr.table.concat(empty_amr_table).collect(),
+        vfdb.table.concat(empty_vfdb_table).collect(),
+        eggnog.table.concat(empty_eggnog_table).collect(),
+        strain.table.concat(empty_strain_table).collect()
     )
 }

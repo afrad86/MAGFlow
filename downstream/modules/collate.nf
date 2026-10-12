@@ -1,6 +1,8 @@
 process COLLATE_FEATURES {
     tag 'cohort feature tables'
-    publishDir "${params.outdir}/18_summary/batches/${params.batch_id}", mode: 'copy', overwrite: false
+    // Re-running an incomplete batch with -resume must replace its partial
+    // collated tables with the complete tables from the resumed run.
+    publishDir "${params.outdir}/18_summary/batches/${params.batch_id}", mode: 'copy', overwrite: true
 
     input:
     path amrFiles

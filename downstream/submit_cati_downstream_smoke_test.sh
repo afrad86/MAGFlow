@@ -107,6 +107,11 @@ EGGNOG_DB_FINGERPRINT="$(fingerprint_path "${EGGNOG_DATA}")"
     -with-dag "${smoke_log_dir}/dag_${RUN_ID}.html" \
     -resume
 
+if ! python3 "${script_dir}/scripts/check_trace_failures.py" "${trace_file}"; then
+    echo "ERROR: Smoke run had failed analysis tasks. Successful per-tool outputs are retained; production state is unchanged." >&2
+    exit 1
+fi
+
 echo "=================================================="
 echo "CATI downstream smoke test finished: $(date)"
 echo "Smoke results             : ${smoke_outdir}"
