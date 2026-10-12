@@ -90,13 +90,9 @@ workflow {
             tuple(key[0], key[1], records, genomes)
         }
         .combine(pending_keys)
-        .map { pair ->
-            def group = pair[0]
-            def pending = pair[1]
-            def participant = group[0]
-            def species = group[1]
-            def records = group[2]
-            def genomes = group[3]
+        // combine() flattens tuple values, so the emitted item is
+        // [participant, species, records, genomes, pendingKeys].
+        .map { participant, species, records, genomes, pending ->
             def tagged = records.collect { record ->
                 [record[0], record[1], record[2], pending.contains("${record[0]}\t${record[2]}")]
             }
