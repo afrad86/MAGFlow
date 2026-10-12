@@ -39,15 +39,17 @@ workflow {
         }
         .ifEmpty { error "No MAG records found in ${params.input}" }
 
-    // Catch duplicate identifiers before any tasks publish a file with that name.
-    def manifest = manifest_rows.collect().flatMap { rows ->
-        def seen = [] as Set
-        rows.each { row ->
-            def id = [row[0], row[3]]
-            if (!seen.add(id)) error "Duplicate sample/mag_id in manifest: ${row[0]}/${row[3]}"
+    // Catch duplicate identifiers without collect(), which flattens tuple
+    // fields by default and would make this check index scalar values.
+    def manifest = manifest_rows
+        .map { row -> tuple([row[0], row[3]], row) }
+        .groupTuple()
+        .flatMap { key, rows ->
+            if (rows.size() > 1) {
+                error "Duplicate sample/mag_id in manifest: ${key[0]}/${key[1]}"
+            }
+            rows
         }
-        rows
-    }
 
     def all_manifest = Channel.fromPath(params.all_input, checkIfExists: true)
         .splitCsv(header: true, sep: '\t')
