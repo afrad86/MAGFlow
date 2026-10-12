@@ -16,7 +16,7 @@ process EGGNOG_ANNOTATE {
     set -euo pipefail
     # Database snapshot fingerprint participates in the Nextflow task hash.
     echo '${params.eggnog_db_fingerprint}' >/dev/null
-    emapper.py --data_dir '${dataDir}' --input '${proteins}' --itype proteins \\
+    emapper.py --data_dir '${dataDir}' -i '${proteins}' --itype proteins \\
       --output eggnog --output_dir . --cpu ${task.cpus} --sensmode '${sensitivity}' ${extraOptions}
     python3 '${projectDir}/scripts/normalize_eggnog.py' \\
       --input eggnog.emapper.annotations --output '${sample}__${mag}_eggnog.tsv' \\
