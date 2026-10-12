@@ -10,7 +10,9 @@ OUTPUT_FIELDS = ['sample', 'participant_id', 'visit', 'mag_id', 'gene_id', 'seed
                  'KEGG_pathway', 'KEGG_module', 'KEGG_reaction', 'KEGG_rclass', 'BRITE',
                  'KEGG_TC', 'CAZy', 'BiGG_reaction', 'PFAMs']
 MAP = {
-    'query_name': 'gene_id', 'seed_ortholog': 'seed_ortholog', 'evalue': 'evalue',
+    # eggNOG-mapper 2.1.12 emits `#query`; other releases may emit `#query_name`.
+    'query': 'gene_id', 'query_name': 'gene_id',
+    'seed_ortholog': 'seed_ortholog', 'evalue': 'evalue',
     'score': 'score', 'eggNOG_OGs': 'eggNOG_OGs', 'max_annot_lvl': 'max_annotated_level',
     'COG_category': 'COG_category', 'Description': 'description', 'Preferred_name': 'preferred_name',
     'GOs': 'GO_terms', 'EC': 'EC_number', 'KEGG_ko': 'KEGG_ko', 'KEGG_Pathway': 'KEGG_pathway',
@@ -27,7 +29,8 @@ def main():
     a = p.parse_args()
     with open(a.input) as src:
         lines = src.readlines()
-    header_at = next((i for i, line in enumerate(lines) if line.startswith('#query_name\t')), None)
+    header_at = next((i for i, line in enumerate(lines)
+                      if line.startswith(('#query\t', '#query_name\t'))), None)
     with open(a.output, 'w', newline='') as dst:
         writer = csv.DictWriter(dst, fieldnames=OUTPUT_FIELDS, delimiter='\t', lineterminator='\n')
         writer.writeheader()
@@ -36,11 +39,13 @@ def main():
         headers = lines[header_at].lstrip('#').rstrip('\r\n').split('\t')
         reader = csv.DictReader(lines[header_at + 1:], fieldnames=headers, delimiter='\t')
         for row in reader:
-            if not row.get('query_name') or row['query_name'].startswith('#'):
+            query = row.get('query_name') or row.get('query')
+            if not query or query.startswith('#'):
                 continue
             output = {'sample': a.sample, 'participant_id': a.participant,
                       'visit': a.visit, 'mag_id': a.mag}
             output.update({target: row.get(source, '') or '' for source, target in MAP.items()})
+            output['gene_id'] = query
             writer.writerow(output)
 
 

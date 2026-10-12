@@ -187,6 +187,8 @@ Each batch keeps per-tool output and normalized batch tables. The cumulative coh
 
 AMR, VFDB, and eggNOG outputs retain header-only per-MAG tables when no passing hit is found. A missing feature row means no passing hit was reported; it does not establish biological absence. Downstream task work files, logs, checkpoint state, and Nextflow cache are separate from the core MAGFlow workflow.
 
+The eggNOG normalizer accepts both `#query` and `#query_name` annotation headers. It is staged as a task input, so a normalizer update invalidates old eggNOG task-cache results and regenerates the normalized tables on a resumed run.
+
 ### Databases and software
 
 Databases are external, user-managed resources. The workflow does not download or silently update them during an analysis. On Farm22, the launchers currently use:

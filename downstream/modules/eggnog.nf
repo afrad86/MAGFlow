@@ -1,12 +1,13 @@
 process EGGNOG_ANNOTATE {
     tag "${sample}:${mag}"
-    publishDir "${params.outdir}/16_eggnog/${params.batch_id}", mode: 'copy', overwrite: false
+    publishDir "${params.outdir}/16_eggnog/${params.batch_id}", mode: 'copy', overwrite: true
 
     input:
     tuple val(sample), val(participant), val(visit), val(mag), val(species), path(genome), path(proteins)
     val dataDir
     val sensitivity
     val extraOptions
+    path normalizer
 
     output:
     path("${sample}__${mag}_eggnog.tsv"), emit: table
@@ -18,7 +19,7 @@ process EGGNOG_ANNOTATE {
     echo '${params.eggnog_db_fingerprint}' >/dev/null
     emapper.py --data_dir '${dataDir}' -i '${proteins}' --itype proteins \\
       --output eggnog --output_dir . --cpu ${task.cpus} --sensmode '${sensitivity}' ${extraOptions}
-    python3 '${projectDir}/scripts/normalize_eggnog.py' \\
+    python3 '${normalizer}' \\
       --input eggnog.emapper.annotations --output '${sample}__${mag}_eggnog.tsv' \\
       --sample '${sample}' --participant '${participant}' --visit '${visit}' --mag '${mag}'
     """

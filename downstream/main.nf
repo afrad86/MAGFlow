@@ -72,8 +72,11 @@ workflow {
     def amr = AMRFINDER(amr_inputs, params.amrfinder_db)
     def vfdb = VFDB_SEARCH(manifest, params.vfdb_db,
         params.vfdb_min_identity, params.vfdb_min_query_cover, params.vfdb_evalue)
+    // Stage the normalizer as an input so changing it changes the eggNOG task
+    // hash and -resume reruns stale normalized outputs.
+    def eggnog_normalizer = file("${projectDir}/scripts/normalize_eggnog.py")
     def eggnog = EGGNOG_ANNOTATE(manifest, params.eggnog_data,
-        params.eggnog_sensitivity, params.eggnog_options)
+        params.eggnog_sensitivity, params.eggnog_options, eggnog_normalizer)
     // Header-only sentinels let collation run when every task in a tool branch
     // fails under errorStrategy 'ignore'. They also keep empty-result tables valid.
     def empty_amr_table = Channel.fromPath("${projectDir}/assets/empty_amr.tsv", checkIfExists: true)
