@@ -28,13 +28,13 @@ def read_trace(path):
 
 
 def latest_trace(log_dir):
-    traces = list(log_dir.glob("trace_*.txt"))
+    traces = list(log_dir.glob("trace_CATI_downstream_*.txt"))
     return max(traces, key=lambda p: p.stat().st_mtime) if traces else None
 
 
 def trace_job_id(trace_path):
     # Farm22 run IDs are LSF job IDs; timestamp-based IDs are also supported.
-    match = re.fullmatch(r"trace_(\d+)\.txt", trace_path.name)
+    match = re.fullmatch(r"trace_CATI_downstream_(?:smoke_)?(\d+)\.txt", trace_path.name)
     return match.group(1) if match else None
 
 
@@ -259,7 +259,7 @@ def main():
     if args.watch is not None and args.watch < 1:
         parser.error("--watch must be at least 1 second")
 
-    logs_dir = args.logs_dir or args.root / "MAGFlow_logs" / "CATI_downstream"
+    logs_dir = args.logs_dir or args.root / "MAGFlow_logs"
     state_dir = args.state_dir or args.root / "CATI_downstream_state"
     try:
         while True:

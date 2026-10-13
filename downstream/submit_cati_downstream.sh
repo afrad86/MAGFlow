@@ -5,8 +5,10 @@
 #BSUB -M 8192MB
 #BSUB -R "select[mem>=8192MB] rusage[mem=8192MB]"
 #BSUB -W 720:00
-#BSUB -o /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream/nextflow.%J.out
-#BSUB -e /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream/nextflow.%J.err
+# Keep driver logs directly under MAGFlow_logs, like the core MAGFlow launcher.
+# The directory must exist before `bsub < submit_cati_downstream.sh`.
+#BSUB -o /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream.nextflow.%J.out
+#BSUB -e /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream.nextflow.%J.err
 
 set -euo pipefail
 
@@ -29,9 +31,9 @@ source "${script_dir}/scripts/database_fingerprint.sh"
 CATI_ROOT="${CATI_ROOT:-/data/pam/ha7g/scratch/projects/metagenomics/CATI}"
 export CATI_ROOT
 export MAGFLOW_RESULTS_DIR="${MAGFLOW_RESULTS_DIR:-${CATI_ROOT}/MAGFlow_results}"
-export CATI_DOWNSTREAM_LOG_DIR="${CATI_DOWNSTREAM_LOG_DIR:-${CATI_ROOT}/MAGFlow_logs/CATI_downstream}"
+export CATI_DOWNSTREAM_LOG_DIR="${CATI_DOWNSTREAM_LOG_DIR:-${CATI_ROOT}/MAGFlow_logs}"
 export CATI_DOWNSTREAM_RESULTS_DIR="${CATI_DOWNSTREAM_RESULTS_DIR:-${MAGFLOW_RESULTS_DIR}}"
-export CATI_DOWNSTREAM_WORK_DIR="${CATI_DOWNSTREAM_WORK_DIR:-${CATI_ROOT}/MAGFlow_work/CATI_downstream}"
+export CATI_DOWNSTREAM_WORK_DIR="${CATI_DOWNSTREAM_WORK_DIR:-${CATI_ROOT}/MAGFlow_work}"
 export CATI_DOWNSTREAM_STATE_DIR="${CATI_DOWNSTREAM_STATE_DIR:-${CATI_ROOT}/CATI_downstream_state}"
 export CATI_PENDING_MANIFEST="${CATI_PENDING_MANIFEST:-${CATI_ROOT}/CATI_downstream_manifest.tsv}"
 
@@ -58,7 +60,7 @@ echo "MAGFlow inputs           : ${MAGFLOW_RESULTS_DIR}"
 echo "Results root             : ${CATI_DOWNSTREAM_RESULTS_DIR}"
 echo "Work directory           : ${CATI_DOWNSTREAM_WORK_DIR}"
 echo "State directory          : ${CATI_DOWNSTREAM_STATE_DIR}"
-echo "Nextflow engine log      : ${CATI_DOWNSTREAM_LOG_DIR}/nextflow_${RUN_ID}.log"
+echo "Nextflow engine log      : ${CATI_DOWNSTREAM_LOG_DIR}/CATI_downstream_nextflow_${RUN_ID}.log"
 echo "Nextflow task cache      : ${downstream_dir}/.nextflow/cache"
 echo "Resume                   : enabled (-resume)"
 module list
@@ -135,10 +137,10 @@ cp "${CATI_DOWNSTREAM_STATE_DIR}/current_manifest.tsv" "${batch_state_dir}/curre
     --vfdb_db_fingerprint "${VFDB_DB_FINGERPRINT}" \
     --eggnog_data "${EGGNOG_DATA}" \
     --eggnog_db_fingerprint "${EGGNOG_DB_FINGERPRINT}" \
-    --trace_file "${CATI_DOWNSTREAM_LOG_DIR}/trace_${RUN_ID}.txt" \
-    -with-report "${CATI_DOWNSTREAM_LOG_DIR}/report_${RUN_ID}.html" \
-    -with-timeline "${CATI_DOWNSTREAM_LOG_DIR}/timeline_${RUN_ID}.html" \
-    -with-dag "${CATI_DOWNSTREAM_LOG_DIR}/dag_${RUN_ID}.html"
+    --trace_file "${CATI_DOWNSTREAM_LOG_DIR}/trace_CATI_downstream_${RUN_ID}.txt" \
+    -with-report "${CATI_DOWNSTREAM_LOG_DIR}/CATI_downstream_report_${RUN_ID}.html" \
+    -with-timeline "${CATI_DOWNSTREAM_LOG_DIR}/CATI_downstream_timeline_${RUN_ID}.html" \
+    -with-dag "${CATI_DOWNSTREAM_LOG_DIR}/CATI_downstream_dag_${RUN_ID}.html"
 
 rm -f "${active_batch}"
 echo "=================================================="

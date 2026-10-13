@@ -223,7 +223,7 @@ cd ~/pipelines/MAGFlow-downstream-cati/downstream
 bsub < submit_cati_downstream.sh
 ```
 
-The production launcher rebuilds manifests automatically, chooses or resumes the batch directory, runs Nextflow with `-resume`, and only merges results after a successful analysis. Logs and Nextflow reports are stored under `MAGFlow_logs/CATI_downstream/`; task work files are under `MAGFlow_work/CATI_downstream/`; state and checkpoints are under `CATI_downstream_state/`. The downstream Nextflow cache is `~/pipelines/MAGFlow-downstream-cati/downstream/.nextflow/cache/`. Preserve both cache and work directories for resume. The launcher prevents concurrent smoke and production runs because they share the same cache and work directory.
+The production launcher rebuilds manifests automatically, chooses or resumes the batch directory, runs Nextflow with `-resume`, and only merges results after a successful analysis. Downstream logs and Nextflow reports are written directly under `MAGFlow_logs/` with `CATI_downstream` filename prefixes; task work files are written directly under `MAGFlow_work/`, matching the core MAGFlow layout. State and checkpoints remain under `CATI_downstream_state/`. The downstream Nextflow cache is `~/pipelines/MAGFlow-downstream-cati/downstream/.nextflow/cache/`. Preserve both cache and work directories for resume. The launcher prevents concurrent smoke and production runs because they share the same cache and work directory.
 
 To validate selected sample visits before a production run, list exact sample IDs (one per line) in `CATI_downstream_smoke_test/sample_ids.txt`, then submit:
 
@@ -248,11 +248,11 @@ The dashboard is read-only. It reads the latest downstream trace and reports sam
 python3 scripts/cati_downstream_status.py \
   --root /data/pam/ha7g/scratch/projects/metagenomics/CATI/CATI_downstream_smoke_test \
   --state-dir /data/pam/ha7g/scratch/projects/metagenomics/CATI/CATI_downstream_smoke_test/state \
-  --trace /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream_smoke_test/trace_JOBID.txt \
+  --trace /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/trace_CATI_downstream_smoke_JOBID.txt \
   --manifest /data/pam/ha7g/scratch/projects/metagenomics/CATI/CATI_downstream_smoke_test/state/smoke_manifest.tsv
 ```
 
-The launchers also write per-run Nextflow logs, trace, report, timeline, and DAG under the corresponding downstream log directory.
+The launchers also write per-run Nextflow logs, trace, report, timeline, and DAG directly under `MAGFlow_logs/`, using `CATI_downstream` or `CATI_downstream_smoke` filename prefixes to distinguish them from core MAGFlow logs.
 
 Key parameters are set in `downstream/nextflow.config` or passed to the standalone workflow:
 

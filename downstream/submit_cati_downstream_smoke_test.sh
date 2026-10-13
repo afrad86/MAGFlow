@@ -5,8 +5,8 @@
 #BSUB -M 8192MB
 #BSUB -R "select[mem>=8192MB] rusage[mem=8192MB]"
 #BSUB -W 720:00
-#BSUB -o /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream_smoke_test/nextflow.%J.out
-#BSUB -e /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream_smoke_test/nextflow.%J.err
+#BSUB -o /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream_smoke.nextflow.%J.out
+#BSUB -e /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/CATI_downstream_smoke.nextflow.%J.err
 
 set -euo pipefail
 
@@ -31,8 +31,8 @@ production_state="${CATI_DOWNSTREAM_STATE_DIR:-${CATI_ROOT}/CATI_downstream_stat
 smoke_root="${CATI_DOWNSTREAM_SMOKE_DIR:-${CATI_ROOT}/CATI_downstream_smoke_test}"
 smoke_state="${smoke_root}/state"
 smoke_outdir="${CATI_DOWNSTREAM_SMOKE_RESULTS_DIR:-${MAGFLOW_RESULTS_DIR}/CATI_downstream_smoke_test}"
-smoke_log_dir="${CATI_DOWNSTREAM_SMOKE_LOG_DIR:-${CATI_ROOT}/MAGFlow_logs/CATI_downstream_smoke_test}"
-work_dir="${CATI_DOWNSTREAM_WORK_DIR:-${CATI_ROOT}/MAGFlow_work/CATI_downstream}"
+smoke_log_dir="${CATI_DOWNSTREAM_SMOKE_LOG_DIR:-${CATI_ROOT}/MAGFlow_logs}"
+work_dir="${CATI_DOWNSTREAM_WORK_DIR:-${CATI_ROOT}/MAGFlow_work}"
 sample_file="${CATI_SMOKE_SAMPLES_FILE:-${smoke_root}/sample_ids.txt}"
 
 AMRFINDER_DB="${AMRFINDER_DB:-/data/pam/ha7g/scratch/databases/cati_downstream/amrfinderplus/4.2.7/latest}"
@@ -60,7 +60,7 @@ fi
 RUN_ID="${LSB_JOBID:-$(date +%Y%m%d_%H%M%S)}"
 full_manifest="${smoke_state}/current_manifest.tsv"
 pending_manifest="${smoke_state}/smoke_manifest.tsv"
-trace_file="${smoke_log_dir}/trace_${RUN_ID}.txt"
+trace_file="${smoke_log_dir}/trace_CATI_downstream_smoke_${RUN_ID}.txt"
 nextflow_bin="${HOME}/software/nextflow"
 
 cd "${downstream_dir}"
@@ -88,7 +88,7 @@ AMRFINDER_DB_FINGERPRINT="$(fingerprint_path "${AMRFINDER_DB}")"
 VFDB_DB_FINGERPRINT="$(fingerprint_path "${VFDB_DB}.dmnd")"
 EGGNOG_DB_FINGERPRINT="$(fingerprint_path "${EGGNOG_DATA}")"
 
-"${nextflow_bin}" -log "${smoke_log_dir}/nextflow_${RUN_ID}.log" run "${downstream_dir}/main.nf" \
+"${nextflow_bin}" -log "${smoke_log_dir}/CATI_downstream_smoke_nextflow_${RUN_ID}.log" run "${downstream_dir}/main.nf" \
     -profile farm22,conda \
     --input "${pending_manifest}" \
     --all_input "${full_manifest}" \
@@ -102,9 +102,9 @@ EGGNOG_DB_FINGERPRINT="$(fingerprint_path "${EGGNOG_DATA}")"
     --eggnog_data "${EGGNOG_DATA}" \
     --eggnog_db_fingerprint "${EGGNOG_DB_FINGERPRINT}" \
     --trace_file "${trace_file}" \
-    -with-report "${smoke_log_dir}/report_${RUN_ID}.html" \
-    -with-timeline "${smoke_log_dir}/timeline_${RUN_ID}.html" \
-    -with-dag "${smoke_log_dir}/dag_${RUN_ID}.html" \
+    -with-report "${smoke_log_dir}/CATI_downstream_smoke_report_${RUN_ID}.html" \
+    -with-timeline "${smoke_log_dir}/CATI_downstream_smoke_timeline_${RUN_ID}.html" \
+    -with-dag "${smoke_log_dir}/CATI_downstream_smoke_dag_${RUN_ID}.html" \
     -resume
 
 if ! python3 "${script_dir}/scripts/check_trace_failures.py" "${trace_file}"; then
