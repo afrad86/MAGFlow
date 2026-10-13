@@ -242,7 +242,7 @@ python3 scripts/cati_downstream_status.py
 python3 scripts/cati_downstream_status.py --watch 30
 ```
 
-The dashboard is read-only. For each tool, it reports sample visits as completed, running (at least one MAG/group task is executing), pending (tasks are queued, not yet submitted, or have no trace row), failed, or aborted. These states are counted separately. It also reports LSF RUN/PEND counts. For a smoke run, pass its explicit manifest so expected MAGs are counted correctly:
+The dashboard is read-only. It combines completed tasks from the Nextflow trace with live `TaskHandler` states from the corresponding `CATI_downstream_nextflow_JOBID.log`. For each tool, it reports sample visits as completed, running (at least one MAG/group task is executing), pending (tasks are queued, not yet submitted, or have no task state yet), failed, or aborted. These states are counted separately. LSF RUN/PEND counts are taken from live task job IDs. For a smoke run, pass its explicit manifest so expected MAGs are counted correctly:
 
 ```bash
 python3 scripts/cati_downstream_status.py \

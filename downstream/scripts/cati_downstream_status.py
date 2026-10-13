@@ -17,6 +17,11 @@ PROCESS_ORDER = [
     "AMRFINDER", "VFDB_SEARCH", "EGGNOG_ANNOTATE", "STRAIN_FASTANI",
 ]
 FINISHED = {"COMPLETED", "CACHED"}
+LIVE_STATUSES = {"NEW", "SUBMITTED", "RUNNING"}
+TASK_HANDLER = re.compile(
+    r"TaskHandler\[jobId:\s*(?P<job>[^;]+);\s*id:\s*(?P<id>\d+);\s*"
+    r"name:\s*(?P<name>.*?);\s*status:\s*(?P<status>[A-Z_]+);"
+)
 
 
 def read_trace(path):
@@ -25,6 +30,30 @@ def read_trace(path):
         if not reader.fieldnames or not {"name", "status"}.issubset(reader.fieldnames):
             raise ValueError(f"Not a Nextflow trace file: {path}")
         return list(reader)
+
+
+def read_live_tasks(path):
+    """Read the latest task states logged by Nextflow's live TaskHandler output."""
+    if not path or not path.is_file():
+        return []
+
+    latest = {}
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            match = TASK_HANDLER.search(line)
+            if not match:
+                continue
+            task_id = match.group("id")
+            job_id = match.group("job").strip()
+            latest[task_id] = {
+                "task_id": task_id,
+                "native_id": "" if job_id.lower() in {"null", "-", ""} else job_id,
+                "name": match.group("name").strip(),
+                "status": match.group("status").upper(),
+                "attempt": "1",
+            }
+
+    return [row for row in latest.values() if row["status"] in LIVE_STATUSES]
 
 
 def latest_trace(log_dir):
@@ -36,6 +65,15 @@ def trace_job_id(trace_path):
     # Farm22 run IDs are LSF job IDs; timestamp-based IDs are also supported.
     match = re.fullmatch(r"trace_CATI_downstream_(?:smoke_)?(\d+)\.txt", trace_path.name)
     return match.group(1) if match else None
+
+
+def engine_log_for_trace(log_dir, trace_path):
+    job_id = trace_job_id(trace_path)
+    if not job_id:
+        return None
+    kind = "smoke_" if "_smoke_" in trace_path.name else ""
+    filename = f"CATI_downstream_{kind}nextflow_{job_id}.log"
+    return log_dir / filename
 
 
 def read_manifest(path):
@@ -156,7 +194,7 @@ def sample_progress(rows, process, sample_ids, pending_rows):
     }
 
 
-def print_dashboard(root, state_dir, trace, rows, manifest_override=None):
+def print_dashboard(root, state_dir, trace, rows, live_rows, manifest_override=None):
     job_id = trace_job_id(trace)
     batch_file = state_dir / "active_batch.tsv"
     batch_id = "not recorded (job may have finalized)"
@@ -190,8 +228,12 @@ def print_dashboard(root, state_dir, trace, rows, manifest_override=None):
         sample_ids = {task_sample(row) for row in rows if task_sample(row)}
     sample_ids.discard("")
 
+    trace_task_ids = {str(row.get("task_id", "")) for row in rows if row.get("task_id")}
+    live_rows = [row for row in live_rows if str(row.get("task_id", "")) not in trace_task_ids]
+    all_rows = rows + live_rows
+
     progress = {
-        process: sample_progress(rows, process, sample_ids, pending_rows)
+        process: sample_progress(all_rows, process, sample_ids, pending_rows)
         for process in PROCESS_ORDER
     }
 
@@ -200,7 +242,7 @@ def print_dashboard(root, state_dir, trace, rows, manifest_override=None):
     print("=" * 60)
     print(f"Run lineage : {batch_id}")
     print(f"Samples     : {len(sample_ids)}")
-    print(f"Tasks       : {len(rows)}")
+    print(f"Tasks       : {len(rows)} trace records; {len(live_rows)} active/queued")
     print()
     print("Completed")
     print("-" * 60)
@@ -213,7 +255,6 @@ def print_dashboard(root, state_dir, trace, rows, manifest_override=None):
     if not any_completed:
         print("None")
 
-    print("\n" + "-" * 60)
     for section, key, icon in (("Running", "running", "◷"), ("Pending", "pending", "⌛")):
         print("\n" + "-" * 60)
         print(section)
@@ -242,10 +283,10 @@ def print_dashboard(root, state_dir, trace, rows, manifest_override=None):
         if not any_state:
             print("None")
 
-    running_job_ids = {row.get("native_id") for row in rows
+    running_job_ids = {row.get("native_id") for row in live_rows
                        if row.get("native_id") and row.get("status", "").upper() == "RUNNING"}
-    pending_job_ids = {row.get("native_id") for row in rows
-                       if row.get("native_id") and row.get("status", "").upper() in {"SUBMITTED", "NEW"}}
+    pending_job_ids = {row.get("native_id") for row in live_rows
+                       if row.get("native_id") and row.get("status", "").upper() == "SUBMITTED"}
     print("\n" + "-" * 60)
     print("LSF Jobs")
     print("-" * 60)
@@ -260,6 +301,8 @@ def main():
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--watch", type=int, metavar="SECONDS", help="refresh repeatedly at this interval")
     parser.add_argument("--trace", type=Path, help="inspect a specific Nextflow trace file")
+    parser.add_argument("--nextflow-log", type=Path,
+                        help="live Nextflow engine log corresponding to the trace")
     parser.add_argument("--manifest", type=Path,
                         help="pending manifest for this run (useful for smoke-test runs)")
     args = parser.parse_args()
@@ -281,9 +324,11 @@ def main():
                 print("Submit the downstream job first; its trace will appear while Nextflow runs.")
                 return 1
             rows = read_trace(trace)
+            engine_log = args.nextflow_log or engine_log_for_trace(logs_dir, trace)
+            live_rows = read_live_tasks(engine_log)
             if args.watch:
                 print("\033[2J\033[H", end="")
-            print_dashboard(args.root, state_dir, trace, rows, args.manifest)
+            print_dashboard(args.root, state_dir, trace, rows, live_rows, args.manifest)
             if not args.watch:
                 break
             time.sleep(args.watch)
