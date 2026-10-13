@@ -228,9 +228,15 @@ def print_dashboard(root, state_dir, trace, rows, live_rows, manifest_override=N
         sample_ids = {task_sample(row) for row in rows if task_sample(row)}
     sample_ids.discard("")
 
-    trace_task_ids = {str(row.get("task_id", "")) for row in rows if row.get("task_id")}
-    live_rows = [row for row in live_rows if str(row.get("task_id", "")) not in trace_task_ids]
-    all_rows = rows + live_rows
+    # Trace files can already contain a task row with status SUBMITTED while
+    # the engine log has since advanced it to RUNNING. Keep the newest live
+    # state for that task instead of dropping it just because its ID is also
+    # present in the trace. Otherwise LSF RUN/PEND totals and sample progress
+    # undercount active jobs.
+    live_task_ids = {str(row.get("task_id", "")) for row in live_rows
+                     if row.get("task_id")}
+    all_rows = [row for row in rows
+                if str(row.get("task_id", "")) not in live_task_ids] + live_rows
 
     progress = {
         process: sample_progress(all_rows, process, sample_ids, pending_rows)
