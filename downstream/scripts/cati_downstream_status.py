@@ -78,7 +78,7 @@ def attempt_number(row):
 
 
 def sample_progress(rows, process, sample_ids, pending_rows):
-    """Count finished/active/failed sample visits, collapsing MAG tasks by sample."""
+    """Count sample visits by task state, collapsing MAG tasks by sample."""
     sample_statuses = {}
     expected_counts = Counter()
     selected = [row for row in rows if process_name(row) == process]
@@ -123,13 +123,15 @@ def sample_progress(rows, process, sample_ids, pending_rows):
         for sample in sample_ids:
             sample_statuses[sample] = [row.get("status", "UNKNOWN").upper() for row in selected]
 
-    finished, failed, aborted = set(), set(), set()
+    finished, running, queued, failed, aborted = set(), set(), set(), set(), set()
     for sample in sample_ids:
         sample_states = sample_statuses.get(sample, [])
         expected = expected_counts.get(sample, len(sample_states))
         if process == "STRAIN_FASTANI" and expected == 0:
             # MAGs without an assigned species are intentionally skipped by ANI.
             finished.add(sample)
+        if sample in finished:
+            continue
         if any(state == "FAILED" for state in sample_states):
             finished.discard(sample)
             failed.add(sample)
@@ -138,13 +140,16 @@ def sample_progress(rows, process, sample_ids, pending_rows):
             aborted.add(sample)
         elif expected > 0 and len(sample_states) >= expected and all(state in FINISHED for state in sample_states):
             finished.add(sample)
-    # Unsubmitted and queued samples remain in the in-progress count. This
-    # makes completed + running equal the batch sample total unless a sample
-    # is explicitly listed as failed or aborted.
-    active = set(sample_ids) - finished - failed - aborted
+        elif any(state == "RUNNING" for state in sample_states):
+            running.add(sample)
+        else:
+            # SUBMITTED tasks are waiting for an executor slot; NEW tasks have
+            # not been submitted yet. Samples with no trace row are also queued.
+            queued.add(sample)
     return {
         "finished": finished,
-        "active": active,
+        "running": running,
+        "pending": queued,
         "failed": failed,
         "aborted": aborted,
         "total": len(sample_ids),
@@ -209,16 +214,18 @@ def print_dashboard(root, state_dir, trace, rows, manifest_override=None):
         print("None")
 
     print("\n" + "-" * 60)
-    print("Running")
-    print("-" * 60)
-    any_running = False
-    for process in PROCESS_ORDER:
-        active = len(progress[process]["active"])
-        if active:
-            any_running = True
-            print(f"◷ {process:<25} {active}/{len(sample_ids)}")
-    if not any_running:
-        print("None")
+    for section, key, icon in (("Running", "running", "◷"), ("Pending", "pending", "⌛")):
+        print("\n" + "-" * 60)
+        print(section)
+        print("-" * 60)
+        any_state = False
+        for process in PROCESS_ORDER:
+            count = len(progress[process][key])
+            if count:
+                any_state = True
+                print(f"{icon} {process:<25} {count}/{len(sample_ids)}")
+        if not any_state:
+            print("None")
 
     for section, key in (("Failed", "failed"), ("Aborted", "aborted")):
         print("\n" + "-" * 60)
