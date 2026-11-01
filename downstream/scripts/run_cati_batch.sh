@@ -51,6 +51,11 @@ echo "Nextflow engine log   : ${nextflow_log}"
 echo "Nextflow task cache   : ${downstream_dir}/.nextflow/cache"
 echo "Nextflow trace        : ${trace_file}"
 echo "Resume mode           : enabled (-resume)"
+extra_args=()
+if [[ "${CATI_SKIP_EGGNOG:-0}" == "1" ]]; then
+  extra_args+=(--skip_eggnog true)
+  echo "eggNOG                : SKIPPED (CATI_SKIP_EGGNOG=1); batch will not be finalized"
+fi
 
 "${nextflow_bin}" -log "${nextflow_log}" run "${downstream_dir}/main.nf" \
   -profile farm22,conda \
@@ -60,7 +65,12 @@ echo "Resume mode           : enabled (-resume)"
   --batch_id "${batch_id}" \
   --work_dir "${work_dir}" \
   "$@" \
+  ${extra_args[@]+"${extra_args[@]}"} \
   -resume
+if [[ "${CATI_SKIP_EGGNOG:-0}" == "1" ]]; then
+  echo "eggNOG skipped (CATI_SKIP_EGGNOG=1): collation and finalization intentionally not run; batch '${batch_id}' stays active." >&2
+  exit 4
+fi
 
 # Ignored tool failures allow all independent analyses and partial collation to
 # finish. Do not merge partial data or advance the processed checkpoint; keep

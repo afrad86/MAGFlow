@@ -302,10 +302,10 @@ The downstream profile uses `normal` for tasks under 12 hours and `long` for the
 
 | Process | CPUs | Memory | Wall time | Queue | Software |
 | --- | ---: | ---: | ---: | --- | --- |
-| AMRFINDER | 8 | 12 GB | 4 h | normal | AMRFinderPlus 4.2.7 |
-| VFDB_SEARCH | 8 | 12 GB | 4 h | normal | DIAMOND 2.1.9; VFDB Set A database |
-| EGGNOG_ANNOTATE | 16 | 48 GB | 24 h | long | eggNOG-mapper 2.1.12 |
-| STRAIN_FASTANI | 16 | 24 GB | 24 h | long | FastANI 1.34 |
+| AMRFINDER | 8 | 4 GB | 4 h | normal | AMRFinderPlus 4.2.7 |
+| VFDB_SEARCH | 8 | 4 GB | 4 h | normal | DIAMOND 2.1.9; VFDB Set A database |
+| EGGNOG_ANNOTATE | 16 | 12 GB | 24 h | long | eggNOG-mapper 2.1.12 |
+| STRAIN_FASTANI | 16 | 4 GB | 24 h | long | FastANI 1.34 |
 | COLLATE_FEATURES | 2 | 3 GB | 1 h | normal | Python 3.12 |
 
 The CATI driver launcher requests one CPU and 8 GB in `basement` for up to 30 days; individual tool tasks receive the requests shown above. On Farm22, the corresponding Conda environments are under `/data/pam/ha7g/scratch/conda_envs/`. Database files are stored separately under `/data/pam/ha7g/scratch/databases/cati_downstream/` and are not included in the software environments. See [Databases and software](#databases-and-software) for the database paths and preparation notes.

@@ -12,10 +12,10 @@ def main():
     fields = ['sample', 'participant_id', 'visit', 'mag_id', 'query_gene_id', 'vfdb_subject_id',
               'identity_percent', 'alignment_length', 'query_length', 'subject_length',
               'query_coverage_percent', 'evalue', 'bitscore', 'subject_description']
-    with open(a.output, 'w', newline='') as dst:
+    with open(a.output, 'w', newline='', encoding='utf-8') as dst:
         writer = csv.DictWriter(dst, fieldnames=fields, delimiter='\t', lineterminator='\n')
         writer.writeheader()
-        with open(a.input, newline='') as src:
+        with open(a.input, newline='', encoding='utf-8', errors='replace') as src:
             for row in csv.reader(src, delimiter='\t'):
                 if len(row) < 9:
                     continue

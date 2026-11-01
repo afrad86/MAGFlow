@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 BAD_STATUSES = {"FAILED", "ABORTED", "CANCELLED"}
+OK_STATUSES = {"COMPLETED", "CACHED"}
 
 
 def main():
@@ -19,10 +20,19 @@ def main():
         if not reader.fieldnames or not {"name", "status"}.issubset(reader.fieldnames):
             parser.error(f"Not a valid Nextflow trace file: {args.trace}")
         failures = []
+        succeeded = set()
         for row in reader:
             status = (row.get("status") or "").strip().upper()
-            if status in BAD_STATUSES:
+            if status in OK_STATUSES:
+                succeeded.add((row.get("name") or "").strip())
+            elif status in BAD_STATUSES:
                 failures.append(row)
+
+    # A failed attempt that was retried and later completed is not a failure.
+    recovered = [row for row in failures if (row.get("name") or "").strip() in succeeded]
+    failures = [row for row in failures if (row.get("name") or "").strip() not in succeeded]
+    if recovered:
+        print(f"Ignored {len(recovered)} failed attempt(s) of tasks that later completed (retried).")
 
     if not failures:
         print(f"No failed or aborted tasks in {args.trace}")

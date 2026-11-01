@@ -75,8 +75,13 @@ workflow {
     // Stage the normalizer as an input so changing it changes the eggNOG task
     // hash and -resume reruns stale normalized outputs.
     def eggnog_normalizer = file("${projectDir}/scripts/normalize_eggnog.py")
-    def eggnog = EGGNOG_ANNOTATE(manifest, params.eggnog_data,
-        params.eggnog_sensitivity, params.eggnog_options, eggnog_normalizer)
+    // --skip_eggnog true runs only AMRFinder, VFDB and FastANI; eggNOG and
+    // collation are left for a later run (cached tasks are unaffected).
+    def eggnog = null
+    if (!params.skip_eggnog) {
+        eggnog = EGGNOG_ANNOTATE(manifest, params.eggnog_data,
+            params.eggnog_sensitivity, params.eggnog_options, eggnog_normalizer)
+    }
     // Header-only sentinels let collation run when every task in a tool branch
     // fails under errorStrategy 'ignore'. They also keep empty-result tables valid.
     def empty_amr_table = Channel.fromPath("${projectDir}/assets/empty_amr.tsv", checkIfExists: true)
@@ -112,10 +117,12 @@ workflow {
     def strain = STRAIN_FASTANI(strain_groups)
     def empty_strain_table = Channel.fromPath("${projectDir}/assets/empty_fastani.tsv", checkIfExists: true)
 
-    COLLATE_FEATURES(
-        amr.table.concat(empty_amr_table).collect(),
-        vfdb.table.concat(empty_vfdb_table).collect(),
-        eggnog.table.concat(empty_eggnog_table).collect(),
-        strain.table.concat(empty_strain_table).collect()
-    )
+    if (!params.skip_eggnog) {
+        COLLATE_FEATURES(
+            amr.table.concat(empty_amr_table).collect(),
+            vfdb.table.concat(empty_vfdb_table).collect(),
+            eggnog.table.concat(empty_eggnog_table).collect(),
+            strain.table.concat(empty_strain_table).collect()
+        )
+    }
 }
