@@ -200,7 +200,7 @@ Databases are external, user-managed resources. The workflow does not download o
 | eggNOG-mapper data | `/data/pam/ha7g/scratch/databases/cati_downstream/eggnog`; download data for the selected eggNOG-mapper release and retain its version. |
 | FastANI | No external database; comparisons use the supplied MAG FASTAs. |
 
-The downstream environment definitions pin AMRFinderPlus 4.2.7, DIAMOND 2.1.9, eggNOG-mapper 2.1.12, FastANI 1.34, and Python 3.12 for normalization. On Farm22 the pre-created environments are under `/data/pam/ha7g/scratch/conda_envs/`. Keep database snapshots stable during a run and retain their versions and fingerprints with the batch. If a database or analysis parameter changes after a batch has been processed, use a separate analysis series or deliberately reset its state before reprocessing; the processed checkpoint will not automatically make old MAGs pending.
+The downstream environment definitions pin AMRFinderPlus 4.2.7, DIAMOND 2.1.9, eggNOG-mapper 2.1.12, FastANI 1.34, and Python 3.12 for normalization. On Farm22 the pre-created environments are under `/data/pam/ha7g/scratch/conda_envs/`. Conda environments are not relocatable: a copied environment keeps scripts that point at the original prefix. Recreate an environment at its final path from an explicit package list (`conda list -p /old/path/ENV --explicit > ENV.txt`, then `conda create -p /data/pam/ha7g/scratch/conda_envs/ENV --file ENV.txt`) instead of copying it. Keep database snapshots stable during a run and retain their versions and fingerprints with the batch. If a database or analysis parameter changes after a batch has been processed, use a separate analysis series or deliberately reset its state before reprocessing; the processed checkpoint will not automatically make old MAGs pending.
 
 Prepare databases once in locations readable by the Farm22 compute nodes. The generic commands are:
 
@@ -324,8 +324,8 @@ submit_nextflow.sh      LSF launcher for the main workflow
 downstream/             Independent CATI feature-analysis workflow
 ```
 
-## Current checkout versus existing result folders
+## Current checkout versus the production revision
 
-This README describes the `main.nf` and modules in this Git checkout. That entrypoint runs Bakta and does not currently invoke Prokka, Kraken2, or Bracken. If an existing Farm22 `MAGFlow_results` directory contains `10_prokka`, `12_kraken2`, or `13_bracken`, those outputs came from a different pipeline revision or deployment than the main workflow described here. Check that the Farm22 checkout and Git commit match this repository before relying on the directory list as a description of the code being submitted.
+This README describes the `main.nf` and modules in this Git checkout. That entrypoint runs Bakta and does not invoke Prokka, Kraken2 or Bracken. The CATI results on Farm22 (`10_prokka`, `12_kraken2`, `13_bracken`) were produced by a different revision of the core workflow, which adds Kraken2 and Bracken on host-removed reads and uses Prokka in place of Bakta. That revision is kept on the local branch `farm22-production-2026-11` of the `~/pipelines/MAGFlow` checkout on Farm22, and its README describes it. It has not been merged into this branch or pushed to GitHub.
 
-The CATI downstream workflow expects MAGFlow summary, MAG FASTA, and predicted protein inputs. Its complete workflow and Farm22 instructions are included in the [CATI downstream analyses](#cati-downstream-analyses) section above.
+The CATI downstream workflow expects MAGFlow summary, MAG FASTA and predicted protein inputs. Its complete workflow and Farm22 instructions are included in the [CATI downstream analyses](#cati-downstream-analyses) section above.
