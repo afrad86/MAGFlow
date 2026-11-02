@@ -28,7 +28,7 @@ Paired FASTQ + metadata
 
 Kraken2 and Bracken run on the host-removed reads in parallel with assembly. They are not part of the MAG summary table.
 
-The workflow accepts visit labels `D1`, `M1`, `M2`, `M4` and `M6` (case-insensitive; normalised to uppercase). Other labels, such as M12, M24 or M36, require editing `VALID_VISITS` in `main.nf` before those rows can run.
+The workflow accepts the visit labels in `params.valid_visits` (default `D1`, `M1`, `M2`, `M4`, `M6`, `M12`, `M24`, `M36`; case-insensitive, normalised to uppercase). Add labels in `nextflow.config` or pass `--valid_visits`; a label outside the list stops the run with a message naming the allowed values.
 
 ## Input metadata
 
@@ -133,6 +133,8 @@ conda create -p /data/pam/ha7g/scratch/conda_envs/ENV --file ENV.txt
 | GTDBTK | 4 | 256 GB | 4 h | GTDB-Tk 2.7.1 |
 | PROKKA | 8 | 24 GB | 6 h | Prokka 1.14.5 |
 | COVERM | 8 | 16 GB | 4 h | CoverM (conda) |
+
+A failed task is retried twice and then skipped (`errorStrategy` in `conf/farm22.config`), so one failing sample does not stop the others. The heavy steps (host removal, mapping, Kraken2, metaSPAdes, CheckM2, Prokka) get 1.5x memory and wall time on the retry; GTDB-Tk keeps its memory and gets 1.5x wall time. List skipped tasks after a run with `python3 ~/pipelines/MAGFlow-downstream-cati/downstream/scripts/check_trace_failures.py <trace file>`.
 
 Update module names, environment paths, queues and resources in `conf/farm22.config` when the cluster installation changes.
 

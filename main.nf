@@ -29,13 +29,7 @@ workflow {
      * Allowed longitudinal visits
      * =========================================================================
      */
-    def VALID_VISITS = [
-        'D1',
-        'M1',
-        'M2',
-        'M4',
-        'M6'
-    ]
+    def VALID_VISITS = params.valid_visits.collect { it.toString().trim().toUpperCase() }
 
     /*
      * =========================================================================
@@ -173,17 +167,7 @@ Please update:
              */
             if (row.visit && !(row.visit in VALID_VISITS)) {
 
-                error """
-Invalid visit '${row.visit}' for sample '${row.sample}'.
-
-Allowed visit values are:
-
-    D1
-    M1
-    M2
-    M4
-    M6
-"""
+                error "Invalid visit '${row.visit}' for sample '${row.sample}'. Allowed visit values are: ${VALID_VISITS.join(', ')} (set params.valid_visits to change)."
             }
 
             /*
