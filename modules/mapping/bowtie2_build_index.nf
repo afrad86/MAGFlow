@@ -21,7 +21,6 @@ process BOWTIE2_BUILD_INDEX {
     )
 
     output:
-
     tuple val(sample),
         val(participant_id),
         val(visit),

@@ -33,7 +33,6 @@ process BOWTIE2_MAP {
     )
 
     output:
-
     tuple val(sample),
         val(participant_id),
         val(visit),

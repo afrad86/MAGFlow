@@ -8,7 +8,7 @@
 
 process BOWTIE2_HOST_REMOVAL {
 
-    tag "${participant_id}_${visit}"
+    tag "${visit ? participant_id + '_' + visit : participant_id}"
 
     publishDir "${params.outdir}/02_host_removal/reads",
         mode: 'copy',
@@ -35,12 +35,12 @@ process BOWTIE2_HOST_REMOVAL {
     )
 
     output:
-tuple val(sample),
-      val(participant_id),
-      val(visit),
-      path("${sample}.host_removed_R1.fastq.gz"),
-      path("${sample}.host_removed_R2.fastq.gz"),
-      emit: reads
+    tuple val(sample),
+        val(participant_id),
+        val(visit),
+        path("${sample}.host_removed_R1.fastq.gz"),
+        path("${sample}.host_removed_R2.fastq.gz"),
+        emit: reads
 
 path("${sample}.bowtie2.log"), emit: log
 

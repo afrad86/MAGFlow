@@ -18,7 +18,6 @@ process DASTOOL {
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),

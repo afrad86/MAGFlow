@@ -17,7 +17,6 @@ process METABAT2 {
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),

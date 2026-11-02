@@ -8,11 +8,9 @@ workflow GTDBTK_WORKFLOW {
     bins
 
     main:
-
     GTDBTK(bins)
 
     emit:
-
     results = GTDBTK.out.results
     version = GTDBTK.out.version
 }

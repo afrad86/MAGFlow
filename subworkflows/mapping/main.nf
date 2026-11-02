@@ -8,7 +8,6 @@ workflow MAPPING {
     reads
 
     main:
-
     bowtie2_index = BOWTIE2_BUILD_INDEX(contigs)
 
     index_for_join = bowtie2_index.index.map { sample, participant_id, visit, index_files ->

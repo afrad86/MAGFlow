@@ -23,14 +23,14 @@ process MAG_SUMMARY {
         val(sample),
         val(participant_id),
         val(visit),
+        val(intervention_arm),
         path(checkm2_dir),
         path(gtdbtk_dir),
-        val(bakta_results),
+        val(prokka_results),
         path(coverm_dir)
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),
@@ -48,18 +48,19 @@ process MAG_SUMMARY {
     )
 
     script:
+    def visit_value = visit?.trim() ? visit : "NA"
     """
     set -euo pipefail
 
     mkdir -p ${sample}_summary
-    mkdir -p ${sample}_bakta
+    mkdir -p ${sample}_prokka
 
     ###########################################################################
-    # Reconstruct Bakta directory
+    # Reconstruct Prokka directory
     ###########################################################################
 
-    ${bakta_results.collect { mag, bakta_dir ->
-        "ln -s ${bakta_dir} ${sample}_bakta/${mag}_bakta"
+    ${prokka_results.collect { mag, prokka_dir ->
+        "ln -sfn ${prokka_dir} ${sample}_prokka/${mag}_prokka"
     }.join('\n')}
 
     ###########################################################################
@@ -73,6 +74,9 @@ process MAG_SUMMARY {
         echo "Date      : \$(date)"
         echo "Host      : \$(hostname)"
         echo "Sample    : ${sample}"
+        echo "Participant: ${participant_id}"
+        echo "Visit     : ${visit}"
+        echo "Arm       : ${intervention_arm}"
         echo
 
         python3 --version
@@ -86,11 +90,12 @@ process MAG_SUMMARY {
     python3 ${projectDir}/bin/merge_summary.py \
         --checkm2 ${checkm2_dir}/quality_report.tsv \
         --gtdbtk ${gtdbtk_dir}/gtdbtk.bac120.summary.tsv \
-        --bakta ${sample}_bakta \
+        --prokka ${sample}_prokka \
         --coverm ${coverm_dir}/mag_abundance.normalized.tsv \
         --sample ${sample} \
         --participant ${participant_id} \
-        --visit ${visit} \
+        --visit ${visit_value} \
+        --intervention-arm ${intervention_arm} \
         --output ${sample}_summary/mag_summary.tsv
     """
 }

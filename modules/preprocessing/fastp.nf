@@ -14,12 +14,12 @@ process FASTP {
     )
 
     output:
-tuple val(sample),
-      val(participant_id),
-      val(visit),
-      path("${sample}.trimmed_R1.fastq.gz"),
-      path("${sample}.trimmed_R2.fastq.gz"),
-      emit: reads
+    tuple val(sample),
+        val(participant_id),
+        val(visit),
+        path("${sample}.trimmed_R1.fastq.gz"),
+        path("${sample}.trimmed_R2.fastq.gz"),
+        emit: reads
 
 path("${sample}.fastp.html"), emit: html
 

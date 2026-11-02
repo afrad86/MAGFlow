@@ -8,11 +8,9 @@ workflow CHECKM2_WORKFLOW {
     bins
 
     main:
-
     CHECKM2(bins)
 
     emit:
-
     results = CHECKM2.out.results
     version = CHECKM2.out.version
 }

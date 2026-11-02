@@ -1,7 +1,5 @@
 include { METABAT2 } from '../../modules/binning/metabat2'
-
 include { CONCOCT } from '../../modules/binning/concoct'
-
 include { MAXBIN2 } from '../../modules/binning/maxbin2'
 
 workflow BINNING {
@@ -12,7 +10,6 @@ workflow BINNING {
     reads
 
     main:
-
     contigs_for_join = contigs.map { sample, participant_id, visit, contigs_file ->
         tuple([sample, participant_id, visit], contigs_file)
     }
@@ -63,20 +60,14 @@ workflow BINNING {
         }
 
     metabat2 = METABAT2(metabat2_input)
-
     concoct = CONCOCT(metabat2_input)
-
     maxbin2 = MAXBIN2(maxbin2_input)
 
     emit:
-
     metabat2_bins    = metabat2.bins
     metabat2_version = metabat2.version
-
     concoct_bins     = concoct.bins
     concoct_version  = concoct.version
-
     maxbin2_bins      = maxbin2.bins
     maxbin2_version   = maxbin2.version
-
 }

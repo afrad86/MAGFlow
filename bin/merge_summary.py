@@ -7,12 +7,13 @@ import sys
 from pathlib import Path
 
 
-VERSION = "MAGFlow merge_summary 1.0.0"
+VERSION = "MAGFlow merge_summary 1.1.0"
 
 SUMMARY_HEADER = [
     "sample",
     "participant_id",
     "visit",
+    "intervention_arm",
     "mag_id",
 
     # CheckM2
@@ -37,19 +38,14 @@ SUMMARY_HEADER = [
     "coverm_mean_coverage",
     "coverm_covered_fraction",
 
-    # Bakta
-    "bakta_genome_size_bp",
-    "bakta_gc_percent",
-    "bakta_coding_density_percent",
-    "bakta_cds",
-    "bakta_trna",
-    "bakta_rrna",
-    "bakta_ncrna",
-    "bakta_ncrna_regions",
-    "bakta_crispr_arrays",
-    "bakta_sorfs",
-    "bakta_oric",
-    "bakta_orit"
+    # Prokka
+    "prokka_genome_size_bp",
+    "prokka_contigs",
+    "prokka_gc_percent",
+    "prokka_cds",
+    "prokka_trna",
+    "prokka_tmrna",
+    "prokka_crispr"
 ]
 
 
@@ -139,6 +135,7 @@ def parse_taxonomy(classification):
 
 def read_checkm2(filename):
     """Read CheckM2 quality report."""
+
     mags = {}
 
     with open(filename, encoding="utf-8") as handle:
@@ -180,6 +177,7 @@ def read_checkm2(filename):
 
 def read_gtdbtk(filename):
     """Read GTDB-Tk taxonomy summary."""
+
     mags = {}
 
     with open(filename, encoding="utf-8") as handle:
@@ -210,69 +208,100 @@ def read_gtdbtk(filename):
     return mags
 
 
-def read_bakta(directory):
-    """Read Bakta annotations for all MAGs."""
+def calculate_gc_percent(fasta):
+    """Calculate GC percentage from a FASTA file."""
+
+    total_bases = 0
+    gc_bases = 0
+
+    try:
+        with open(fasta, encoding="utf-8") as handle:
+
+            for line in handle:
+
+                line = line.strip()
+
+                if not line or line.startswith(">"):
+                    continue
+
+                sequence = line.upper()
+
+                total_bases += len(sequence)
+                gc_bases += sequence.count("G") + sequence.count("C")
+
+    except OSError as exc:
+        die(f"Could not read Prokka FASTA {fasta}: {exc}")
+
+    if total_bases == 0:
+        return "NA"
+
+    return round((gc_bases / total_bases) * 100, 2)
+
+
+def read_prokka(directory):
+    """Read Prokka annotations for all MAGs."""
 
     directory = Path(directory)
 
     if not directory.exists():
-        die(f"Bakta directory not found: {directory}")
+        die(f"Prokka directory not found: {directory}")
 
-    bakta = {}
+    prokka = {}
 
-    feature_map = {
-        "cds": "bakta_cds",
-        "tRNA": "bakta_trna",
-        "rRNA": "bakta_rrna",
-        "ncRNA": "bakta_ncrna",
-        "ncRNA-region": "bakta_ncrna_regions",
-        "crispr": "bakta_crispr_arrays",
-        "sorf": "bakta_sorfs",
-        "oriC": "bakta_oric",
-        "oriT": "bakta_orit"
-    }
+    for txt_file in sorted(directory.glob("*/**/*.txt")):
 
-    for json_file in sorted(directory.glob("*/**/*.json")):
+        mag = txt_file.stem
 
-        mag = json_file.stem
+        values = {}
 
-        with open(json_file, encoding="utf-8") as handle:
-            data = json.load(handle)
+        try:
+            with open(txt_file, encoding="utf-8") as handle:
 
-        stats = data.get("stats", {})
-        features = data.get("features", [])
+                for line in handle:
 
-        summary = {
-            "bakta_genome_size_bp": stats.get("size", "NA"),
-            "bakta_gc_percent": round(stats.get("gc", 0.0) * 100, 2),
-            "bakta_coding_density_percent": round(
-                stats.get("coding_ratio", 0.0) * 100,
-                2
-            ),
-            "bakta_cds": 0,
-            "bakta_trna": 0,
-            "bakta_rrna": 0,
-            "bakta_ncrna": 0,
-            "bakta_ncrna_regions": 0,
-            "bakta_crispr_arrays": 0,
-            "bakta_sorfs": 0,
-            "bakta_oric": 0,
-            "bakta_orit": 0
+                    line = line.strip()
+
+                    if not line or ":" not in line:
+                        continue
+
+                    key, value = line.split(":", 1)
+
+                    values[key.strip()] = value.strip()
+
+        except OSError as exc:
+            die(f"Could not read Prokka summary {txt_file}: {exc}")
+
+        if "bases" not in values:
+            continue
+
+        genome_size = values.get("bases", "NA")
+        contigs = values.get("contigs", "NA")
+        cds = values.get("CDS", "NA")
+        crispr = values.get("CRISPR", "NA")
+        trna = values.get("tRNA", "NA")
+        tmrna = values.get("tmRNA", "NA")
+
+        fna_file = txt_file.with_suffix(".fna")
+
+        if fna_file.exists():
+            gc_percent = calculate_gc_percent(fna_file)
+        else:
+            gc_percent = "NA"
+
+        prokka[mag] = {
+            "prokka_genome_size_bp": genome_size,
+            "prokka_contigs": contigs,
+            "prokka_gc_percent": gc_percent,
+            "prokka_cds": cds,
+            "prokka_trna": trna,
+            "prokka_tmrna": tmrna,
+            "prokka_crispr": crispr
         }
 
-        for feature in features:
+    if not prokka:
+        die(f"No valid Prokka annotation summaries found in {directory}")
 
-            feature_type = feature.get("type", "")
-
-            if feature_type in feature_map:
-                summary[feature_map[feature_type]] += 1
-
-        bakta[mag] = summary
-
-    if not bakta:
-        die(f"No Bakta JSON files found in {directory}")
-
-    return bakta
+    return prokka
 
 
 def parse_float(value):
@@ -347,11 +376,12 @@ def read_coverm(filename):
 def write_summary(
     checkm2,
     gtdb,
-    bakta,
+    prokka,
     coverm,
     sample,
     participant,
     visit,
+    intervention_arm,
     output
 ):
 
@@ -371,8 +401,7 @@ def write_summary(
             set(checkm2)
             | set(gtdb)
             | set(coverm)
-            | set(bakta)
-
+            | set(prokka)
         )
 
         for mag in all_mags:
@@ -380,12 +409,13 @@ def write_summary(
             quality = checkm2.get(mag, {})
             taxonomy = gtdb.get(mag, {})
             cover = coverm.get(mag, {})
-            bakta_summary = bakta.get(mag, {})
+            prokka_summary = prokka.get(mag, {})
 
             writer.writerow([
                 sample,
                 participant,
                 visit,
+                intervention_arm,
                 mag,
 
                 quality.get("completeness", "NA"),
@@ -407,34 +437,33 @@ def write_summary(
                 cover.get("coverm_mean_coverage", "NA"),
                 cover.get("coverm_covered_fraction", "NA"),
 
-                bakta_summary.get("bakta_genome_size_bp", "NA"),
-                bakta_summary.get("bakta_gc_percent", "NA"),
-                bakta_summary.get("bakta_coding_density_percent", "NA"),
-                bakta_summary.get("bakta_cds", "NA"),
-                bakta_summary.get("bakta_trna", "NA"),
-                bakta_summary.get("bakta_rrna", "NA"),
-                bakta_summary.get("bakta_ncrna", "NA"),
-                bakta_summary.get("bakta_ncrna_regions", "NA"),
-                bakta_summary.get("bakta_crispr_arrays", "NA"),
-                bakta_summary.get("bakta_sorfs", "NA"),
-                bakta_summary.get("bakta_oric", "NA"),
-                bakta_summary.get("bakta_orit", "NA")
+                prokka_summary.get("prokka_genome_size_bp", "NA"),
+                prokka_summary.get("prokka_contigs", "NA"),
+                prokka_summary.get("prokka_gc_percent", "NA"),
+                prokka_summary.get("prokka_cds", "NA"),
+                prokka_summary.get("prokka_trna", "NA"),
+                prokka_summary.get("prokka_tmrna", "NA"),
+                prokka_summary.get("prokka_crispr", "NA")
             ])
 
 
 def main():
 
     parser = argparse.ArgumentParser(
-        description="Merge CheckM2, GTDB-Tk, CoverM and Bakta results into a MAG summary."
+        description=(
+            "Merge CheckM2, GTDB-Tk, CoverM and Prokka "
+            "results into a MAG summary."
+        )
     )
 
     parser.add_argument("--checkm2", required=True)
     parser.add_argument("--gtdbtk", required=True)
-    parser.add_argument("--bakta", required=True)
+    parser.add_argument("--prokka", required=True)
     parser.add_argument("--coverm", required=True)
     parser.add_argument("--sample", required=True)
     parser.add_argument("--participant", required=True)
     parser.add_argument("--visit", required=True)
+    parser.add_argument("--intervention-arm", default="NA")
     parser.add_argument("--output", required=True)
 
     parser.add_argument(
@@ -447,17 +476,18 @@ def main():
 
     checkm2 = read_checkm2(args.checkm2)
     gtdb = read_gtdbtk(args.gtdbtk)
-    bakta = read_bakta(args.bakta)
+    prokka = read_prokka(args.prokka)
     coverm = read_coverm(args.coverm)
 
     write_summary(
         checkm2,
         gtdb,
-        bakta,
+        prokka,
         coverm,
         args.sample,
         args.participant,
         args.visit,
+        args.intervention_arm,
         args.output
     )
 

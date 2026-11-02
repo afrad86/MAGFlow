@@ -27,7 +27,6 @@ process CHECKM2 {
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),

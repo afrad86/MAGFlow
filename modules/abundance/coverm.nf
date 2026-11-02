@@ -19,7 +19,6 @@ process COVERM {
         }
 
     input:
-
     tuple(
         val(sample),
         val(participant_id),
@@ -30,7 +29,6 @@ process COVERM {
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),
@@ -169,5 +167,4 @@ process COVERM {
     }
     
     """
-
 }

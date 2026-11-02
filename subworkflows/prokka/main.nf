@@ -1,20 +1,19 @@
-include { BAKTA } from '../../modules/annotation/bakta'
+include { PROKKA } from '../../modules/annotation/prokka'
 
-workflow BAKTA_WORKFLOW {
+workflow PROKKA_WORKFLOW {
 
     take:
     mags
 
     main:
+    PROKKA(mags)
 
-    BAKTA(mags)
-
-    bakta_results = BAKTA.out.results
-        .map { sample, participant_id, visit, mag, bakta_dir ->
+    prokka_results = PROKKA.out.results
+        .map { sample, participant_id, visit, mag, prokka_dir ->
 
             tuple(
                 [sample, participant_id, visit],
-                tuple(mag, bakta_dir)
+                tuple(mag, prokka_dir)
             )
         }
         .groupTuple()
@@ -33,8 +32,6 @@ workflow BAKTA_WORKFLOW {
         }
 
     emit:
-
-    results = bakta_results
-
-    version = BAKTA.out.version
+    results = prokka_results
+    version = PROKKA.out.version
 }

@@ -17,7 +17,6 @@ process CONCOCT {
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),

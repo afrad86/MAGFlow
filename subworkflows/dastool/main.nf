@@ -9,7 +9,6 @@ workflow DASTOOL_WORKFLOW {
     maxbin2_bins
 
     main:
-
     contigs_for_join = contigs.map { sample, participant_id, visit, contigs_file ->
         tuple([sample, participant_id, visit], contigs_file)
     }
@@ -78,10 +77,7 @@ workflow DASTOOL_WORKFLOW {
     }
 
     emit:
-
     bins = dastool.bins
-
     mags = mags
-
     version = dastool.version
 }

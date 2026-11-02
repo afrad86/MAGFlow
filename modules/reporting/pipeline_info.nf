@@ -5,7 +5,6 @@ process PIPELINE_INFO {
         overwrite: true
 
     output:
-
     path("pipeline_info.txt"), emit: info
 
     script:

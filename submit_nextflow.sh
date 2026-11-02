@@ -5,8 +5,8 @@
 #BSUB -M 8192MB
 #BSUB -R "select[mem>=8192MB] rusage[mem=8192MB]"
 #BSUB -W 720:00
-#BSUB -o /lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_logs/nextflow.%J.out
-#BSUB -e /lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_logs/nextflow.%J.err
+#BSUB -o /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/nextflow.%J.out
+#BSUB -e /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/nextflow.%J.err
 
 set -euo pipefail
 
@@ -34,7 +34,7 @@ cd ~/pipelines/MAGFlow
 RUN_ID=$(date +%Y%m%d_%H%M%S)
 
 # Default output directory
-OUTDIR="${OUTDIR:-/lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_results}"
+OUTDIR="${OUTDIR:-/data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_results}"
 
 mkdir -p "$OUTDIR"
 
@@ -60,10 +60,10 @@ echo "=================================================="
     -resume \
     --outdir "$OUTDIR" \
     "$@" \
-    -with-report /lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_logs/report_${RUN_ID}.html \
-    -with-trace /lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_logs/trace_${RUN_ID}.txt \
-    -with-timeline /lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_logs/timeline_${RUN_ID}.html \
-    -with-dag /lustre/scratch124/pam/teams/team216/ha7/projects/metagenomics/CATI/MAGFlow_logs/dag_${RUN_ID}.html
+    -with-report /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/report_${RUN_ID}.html \
+    -with-trace /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/trace_${RUN_ID}.txt \
+    -with-timeline /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/timeline_${RUN_ID}.html \
+    -with-dag /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/dag_${RUN_ID}.html
 
 echo "=================================================="
 echo "MAGFlow finished: $(date)"

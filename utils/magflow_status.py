@@ -971,35 +971,84 @@ def merge_tasks(
     merged = {}
 
     # ------------------------------------------------------------------------
-    # First load the completed/failed state from the previous trace.
-    # ------------------------------------------------------------------------
-
-    for task in trace_tasks:
-
-        if not task.name:
-            continue
-
-        merged[task_identity(task)] = task
-
-    # ------------------------------------------------------------------------
-    # Overlay the live current resume session.
+    # Previous trace is the authoritative record of all existing tasks.
     #
-    # A current task ALWAYS supersedes the old trace.
-    # This is what removes stale failures.
+    # IMPORTANT:
+    # Do not use sample/workflow/process as the unique identity because
+    # participant/visit aliases can occur more than once.
     # ------------------------------------------------------------------------
 
-    for task in live_tasks:
+    for index, task in enumerate(trace_tasks):
 
-        if not task.name:
+        if not task.process:
             continue
 
-        merged[task_identity(task)] = task
+        key = (
+            "trace",
+            index
+        )
+
+        merged[key] = task
+
+    # ------------------------------------------------------------------------
+    # Overlay the current live session.
+    #
+    # A live task replaces a trace task ONLY when its Nextflow work directory
+    # matches exactly. Otherwise it is a new task and must be added.
+    #
+    # This prevents new samples with duplicate participant/visit aliases
+    # from overwriting previously completed samples.
+    # ------------------------------------------------------------------------
+
+    for live in live_tasks:
+
+        if not live.process:
+            continue
+
+        match = None
+
+        # First and strongest identity: Nextflow work directory.
+        if live.workdir:
+
+            for key, existing in merged.items():
+
+                if (
+                    existing.workdir
+                    and str(existing.workdir)
+                    == str(live.workdir)
+                ):
+
+                    match = key
+                    break
+
+        # Fallback for live records without workdir.
+        if match is None and live.job_id is not None:
+
+            for key, existing in merged.items():
+
+                if (
+                    existing.job_id == live.job_id
+                    and existing.process == live.process
+                ):
+
+                    match = key
+                    break
+
+        if match is not None:
+
+            merged[match] = live
+
+        else:
+
+            merged[
+                (
+                    "live",
+                    len(merged)
+                )
+            ] = live
 
     # ------------------------------------------------------------------------
     # Overlay current LSF state.
-    #
-    # If Nextflow has submitted a task and LSF says it is RUNNING,
-    # display it as RUNNING.
     # ------------------------------------------------------------------------
 
     for lsf in lsf_tasks:
@@ -1007,17 +1056,13 @@ def merge_tasks(
         if not lsf.sample:
             continue
 
-        candidates = [
-            task
-            for task in merged.values()
-            if task.process == lsf.process
-            and task.sample == lsf.sample
-        ]
+        for task in merged.values():
 
-        if not candidates:
-            continue
+            if task.process != lsf.process:
+                continue
 
-        for task in candidates:
+            if task.sample != lsf.sample:
+                continue
 
             if lsf.status == "RUN":
 
@@ -1041,7 +1086,6 @@ def merge_tasks(
                     task.job_id = lsf.job_id
 
     return list(merged.values())
-
 
 # ============================================================================
 # WORKFLOW MODEL
@@ -1237,13 +1281,13 @@ def get_expected_sample_count(
 
             reader = csv.DictReader(handle)
 
-            sample_ids = {
-                row["sample"].strip()
+            sample_rows = [
+                row
                 for row in reader
                 if row.get("sample", "").strip()
-            }
+            ]
 
-        return len(sample_ids)
+        return len(sample_rows)
 
     except Exception:
         return None
@@ -1794,7 +1838,7 @@ class Dashboard:
 if __name__ == "__main__":
 
     logs = Path(
-        "/lustre/scratch124/pam/teams/team216/ha7/"
+        "/data/pam/ha7g/scratch/"
         "projects/metagenomics/CATI/MAGFlow_logs"
     )
 

@@ -3,12 +3,10 @@ include { COVERM } from '../../modules/abundance/coverm'
 workflow COVERM_WORKFLOW {
 
     take:
-
     alignment
     bins
 
     main:
-
     alignment_for_join = alignment.map {
         sample,
         participant_id,
@@ -52,7 +50,6 @@ workflow COVERM_WORKFLOW {
     COVERM(coverm_input)
 
     emit:
-
     results = COVERM.out.results
     version = COVERM.out.version
 }

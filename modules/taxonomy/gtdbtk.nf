@@ -27,7 +27,6 @@ process GTDBTK {
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),

@@ -1,17 +1,17 @@
-process BAKTA {
+process PROKKA {
 
     tag "${sample}:${mag}"
 
-    publishDir "${params.outdir}/10_bakta",
+    publishDir "${params.outdir}/10_prokka",
         mode: 'copy',
         overwrite: true,
         saveAs: { filename ->
 
-            if (filename == "${mag}_bakta") {
+            if (filename == "${mag}_prokka") {
                 return "${sample}/${filename}"
             }
 
-            if (filename == "${mag}.bakta.version.txt") {
+            if (filename == "${mag}.prokka.version.txt") {
                 return "${sample}/${filename}"
             }
 
@@ -19,7 +19,6 @@ process BAKTA {
         }
 
     input:
-
     tuple(
         val(sample),
         val(participant_id),
@@ -29,13 +28,12 @@ process BAKTA {
     )
 
     output:
-
     tuple(
         val(sample),
         val(participant_id),
         val(visit),
         val(mag),
-        path("${mag}_bakta"),
+        path("${mag}_prokka"),
         emit: results
     )
 
@@ -44,7 +42,7 @@ process BAKTA {
         val(participant_id),
         val(visit),
         val(mag),
-        path("${mag}.bakta.version.txt"),
+        path("${mag}.prokka.version.txt"),
         emit: version
     )
 
@@ -54,7 +52,7 @@ process BAKTA {
 
     {
         echo "========================================"
-        echo "MAGFlow Bakta"
+        echo "MAGFlow Prokka"
         echo "========================================"
         echo "Date      : \$(date)"
         echo "Host      : \$(hostname)"
@@ -64,16 +62,30 @@ process BAKTA {
         echo "Memory    : ${task.memory.toGiga()} GB"
         echo
 
-        which bakta
+        which prokka
         echo
 
-        bakta --version
+        prokka --version
 
-    } > ${mag}.bakta.version.txt 2>&1
+    } > ${mag}.prokka.version.txt 2>&1
 
-    bakta \
-        --threads ${task.cpus} \
-        --output ${mag}_bakta \
-        ${genome}
+    awk '
+        /^>/ {
+            printf ">contig_%d\\n", ++n
+            next
+        }
+        {
+            print
+        }
+    ' ${genome} > ${mag}.prokka_input.fa
+
+    prokka \
+        --outdir ${mag}_prokka \
+        --prefix ${mag} \
+        --cpus ${task.cpus} \
+        --metagenome \
+        --centre X \
+        --compliant \
+        ${mag}.prokka_input.fa
     """
 }

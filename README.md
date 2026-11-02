@@ -1,190 +1,156 @@
-MAGFlow
+# MAGFlow
 
-MAGFlow is a modular Nextflow DSL2 pipeline for reconstructing metagenome-assembled genomes (MAGs) from Illumina paired-end metagenomic sequencing data.
+MAGFlow is a Nextflow DSL2 workflow for processing paired-end Illumina metagenomic reads. It produces read-level taxonomic profiles, metagenome-assembled genomes (MAGs), MAG quality, taxonomy and annotation, and MAG abundance tables. The main workflow is `main.nf`; its stages are composed from reusable modules under `modules/` and `subworkflows/`.
 
-The pipeline is designed for scalability, reproducibility, and execution on HPC clusters using the LSF scheduler. Each analysis stage is implemented as an independent module, allowing components to be developed, tested, and replaced with minimal changes to the overall workflow.
+This README describes the Farm22 production revision of the workflow, which processed the CATI stool metagenomes. The CATI AMR, virulence, functional and longitudinal genome-comparison analyses are a **separate downstream workflow** that consumes MAGFlow results and is not part of `main.nf`. It lives in the `downstream/` folder of the GitHub `main` branch (checked out on Farm22 as `~/pipelines/MAGFlow-downstream-cati`) and is documented in that README.
 
-⸻
+## Workflow
 
-Features
+```text
+Paired FASTQ + metadata
+        │
+        ├── fastp quality control and trimming
+        ├── Bowtie2 host-read removal (Samtools)
+        │        │
+        │        ├── Kraken2 read classification ── Bracken (species level)
+        │        │
+        │        └── metaSPAdes assembly
+        │               ├── Bowtie2 contig indexing and read mapping
+        │               ├── MetaBAT2 ─┐
+        │               ├── CONCOCT ──┼── DAS Tool MAG selection
+        │               └── MaxBin2 ──┘
+        │                              ├── CheckM2 quality assessment
+        │                              ├── GTDB-Tk taxonomy
+        │                              ├── Prokka MAG annotation
+        │                              ├── CoverM abundance estimation
+        │                              └── MAG summary table
+```
 
-* Modular Nextflow DSL2 architecture
-* Metadata validation before execution
-* FASTQ quality control with fastp
-* Host read removal using Bowtie2
-* Metagenome assembly using metaSPAdes
-* Designed for HPC execution with LSF
-* Automatic result organisation
-* Git version control and GitHub integration
+Kraken2 and Bracken run on the host-removed reads in parallel with assembly. They are not part of the MAG summary table.
 
-⸻
+The workflow accepts visit labels `D1`, `M1`, `M2`, `M4` and `M6` (case-insensitive; normalised to uppercase). Other labels, such as M12, M24 or M36, require editing `VALID_VISITS` in `main.nf` before those rows can run.
 
-Pipeline
+## Input metadata
 
-Raw FASTQ
-    │
-    ▼
-Metadata validation
-    │
-    ▼
-FASTP
-    │
-    ▼
-Host removal (Bowtie2)
-    │
-    ▼
-metaSPAdes
-    │
-    ▼
-Read mapping
-    │
-    ▼
-Coverage estimation
-    │
-    ├──────────────┬──────────────┐
-    ▼              ▼              ▼
- MetaBAT2       MaxBin2       CONCOCT
-    └──────────────┴──────────────┘
-                 │
-                 ▼
-              DASTool
-                 │
-                 ▼
-              CheckM2
-                 │
-                 ▼
-              GTDB-Tk
-                 │
-                 ▼
-        MAG abundance estimation
+The default metadata file is `input/metadata.csv`. It must be a CSV with a `sample` column. `participant_id`, `visit`, `r1` and `r2` are optional.
 
-⸻
+```csv
+sample,r1,r2,participant_id,visit
+51448#107,51448#107_1.fastq.gz,51448#107_2.fastq.gz,P001,D1
+51448#108,/data/fastq/51448#108_R1.fastq.gz,/data/fastq/51448#108_R2.fastq.gz,P001,M1
+```
 
-Current Status
+FASTQ paths in `r1` and `r2` may be absolute or relative to `params.fastq_dir`. Supply both columns together. If both are omitted, MAGFlow looks for `${sample}_1.fastq.gz` and `${sample}_2.fastq.gz` under `params.fastq_dir`. `participant_id` defaults to `sample`; an omitted visit is left blank. Keep the same participant ID across visits when you want participant-level longitudinal summaries downstream.
 
-Completed
+## Configure paths and references
 
-* Metadata validation
-* FASTQ validation
-* Visit validation
-* Bowtie2 reference validation
-* FASTP module
-* Bowtie2 host removal module
-* metaSPAdes assembly module
+Site-specific defaults are set in `nextflow.config` and `conf/references.config`. The current Farm22 values are:
 
-Planned
+| Setting | Value |
+| --- | --- |
+| `params.metadata` | `input/metadata.csv` |
+| `params.fastq_dir` | `/data/pam/ha7g/scratch/projects/metagenomics/CATI/fastq` |
+| `params.scratch` (work directory root) | `/data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_work` (override with `NXF_WORK`) |
+| `params.outdir` | `/data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_results` (override with `MAGFLOW_OUTDIR`) |
+| `params.kraken2_db` | `/data/pam/ha7g/scratch/databases/kraken2_standard` |
+| `params.reference_host` (Bowtie2 index prefix) | `/lustre/scratch124/pam/teams/team216/shared/references/genomes/human/GRCh38/bowtie2/GRCh38_noalt_as` |
 
-* Read mapping
-* Coverage calculation
-* MetaBAT2
-* MaxBin2
-* CONCOCT
-* DASTool
-* CheckM2
-* GTDB-Tk
-* MAG abundance estimation
+The host Bowtie2 index is a shared group resource in `team216/shared`; leave it in place. MAGFlow checks that all six `.bt2` index files exist before starting. Bracken is run with read length 150 and species level (`-r 150 -l S`), set in `modules/taxonomy/bracken.nf`. The Kraken2 database must contain the matching `database150mers.kmer_distrib` file; it does.
 
-⸻
+## Run on Farm22
 
-Project Structure
-
-MAGFlow/
-├── assets/
-├── conf/
-├── input/
-├── modules/
-│   ├── preprocessing/
-│   └── assembly/
-├── subworkflows/
-├── main.nf
-├── nextflow.config
-└── submit_nextflow.sh
-
-⸻
-
-Input Metadata
-
-The pipeline expects a CSV metadata file.
-
-Example:
-
-sample,participant_id,visit
-51448#107,P001,D1
-51448#108,P001,M1
-51448#109,P002,D1
-
-Supported visit values:
-
-* D1
-* M1
-* M2
-* M4
-* M6
-
-⸻
-
-Running MAGFlow
-
-Submit the pipeline to the LSF scheduler:
-
+```bash
+cd ~/pipelines/MAGFlow
 bsub < submit_nextflow.sh
+```
 
-⸻
+`submit_nextflow.sh` loads the Farm22 environment and Java, records the run information and Git commit, and launches `main.nf` with the `farm22` profile and `-resume`. `resume_nextflow.sh` is a resume-specific launcher. Both write LSF output and the Nextflow report, trace, timeline and DAG files to `/data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/`. The driver job requests the `basement` queue; the workflow submits the individual analysis tasks to LSF using `conf/farm22.config`.
 
-Output Structure
+Useful monitoring commands:
 
+```bash
+bjobs
+tail -f /data/pam/ha7g/scratch/projects/metagenomics/CATI/MAGFlow_logs/nextflow.<JOB_ID>.out
+python3 utils/magflow_status.py
+```
+
+### Resume and cache
+
+Keep both the Nextflow cache (`~/pipelines/MAGFlow/.nextflow/cache/`) and the work directory (`MAGFlow_work/`) if a run may be resumed. `-resume` reuses completed tasks only when their inputs, commands, configuration and staged scripts match. Do not clear the work directory before a resume, and do not edit module scripts or `task.cpus` of finished processes, because that changes their task hashes.
+
+## Results
+
+```text
 MAGFlow_results/
+├── 00_pipeline_info/
 ├── 01_fastp/
-├── 02_host_removal/
-├── 03_assembly/
-├── 04_mapping/
-├── 05_metabat2/
-├── 06_maxbin2/
-├── 07_concoct/
-├── 08_dastool/
-├── 09_checkm2/
-├── 10_gtdbtk/
-└── 11_abundance/
+├── 02_host_removal/      reads/, logs/, metrics/
+├── 03_assembly/          contigs/, graphs/, reports/
+├── 04_mapping/           index/, bam/, bai/, logs/, reports/
+├── 05_binning/           metabat2/, concoct/, maxbin2/
+├── 06_dastool/
+├── 07_checkm2/
+├── 08_gtdbtk/
+├── 09_summary/
+├── 10_prokka/
+├── 11_abundance/
+├── 12_kraken2/
+└── 13_bracken/
+```
 
-⸻
+The downstream workflow adds `14_amrfinderplus/`, `15_vfdb/`, `16_eggnog/`, `17_fastani/` and `18_summary/` to the same root. The per-sample `mag_summary.tsv` in `09_summary` combines CheckM2 quality, GTDB-Tk taxonomy, annotation and normalised CoverM abundance. Nextflow's intermediate task files are in `MAGFlow_work`, not in the results tree. Large intermediate outputs such as BAM files and host-removed reads may be removed after a study is complete; keep contigs, bins, DAS Tool results and summaries.
 
-Requirements
+## Software, environments and resources
 
-* Nextflow
-* Java 17+
-* fastp
-* Bowtie2
-* Samtools
-* metaSPAdes
+Most tools are loaded as Farm22 modules in `conf/farm22.config`. Two processes use named Conda environments under `/data/pam/ha7g/scratch/conda_envs/`:
 
-Additional software will be incorporated as new modules are added.
+| Process | Environment | Contains |
+| --- | --- | --- |
+| MAXBIN2 | `magflow-binning` | MaxBin2 (`run_MaxBin.pl`), MetaBAT2, CONCOCT, DAS Tool, Bowtie2, Samtools |
+| COVERM | `coverm` | CoverM, Samtools, minimap2, BWA |
 
-⸻
+Only MaxBin2 and CoverM are used from those environments; the other tools come from modules (DAS Tool and its helper scripts come from the `das_tool` module). Conda environments are not relocatable. If their location changes, recreate each one at its final path from an explicit package list:
 
-Development Roadmap
+```bash
+conda list -p /old/path/ENV --explicit > ENV.txt
+conda create -p /data/pam/ha7g/scratch/conda_envs/ENV --file ENV.txt
+```
 
-Version	Milestone
-v0.1.0	Pipeline framework
-v0.2.0	FASTP + Host removal + metaSPAdes
-v0.3.0	Read mapping
-v0.4.0	MetaBAT2
-v0.5.0	MaxBin2
-v0.6.0	CONCOCT
-v0.7.0	DASTool
-v0.8.0	CheckM2
-v0.9.0	GTDB-Tk
-v1.0.0	Stable MAGFlow release
+| Process | CPUs | Memory | Wall time | Software |
+| --- | ---: | ---: | ---: | --- |
+| FASTP | 8 | 8 GB | 1 h | fastp 0.23.4 |
+| BOWTIE2_HOST_REMOVAL | 16 | 48 GB | 4 h | Bowtie2 2.5.1, Samtools 1.21 |
+| BOWTIE2_BUILD_INDEX | 4 | 8 GB | 2 h | Bowtie2 2.5.1 |
+| BOWTIE2_MAP | 16 | 48 GB | 6 h | Bowtie2 2.5.1, Samtools 1.21 |
+| KRAKEN2 | 16 | 128 GB | 2 h | Kraken2 2.1.2 |
+| BRACKEN | 2 | 8 GB | 1 h | Bracken 2.6.2 |
+| METASPADES | 32 | 128 GB | 12 h | SPAdes 4.1.0 |
+| METABAT2 | 4 | 12 GB | 1 h | MetaBAT2 2.15 |
+| CONCOCT | 2 | 16 GB | 6 h | CONCOCT 1.1.0 |
+| MAXBIN2 | 16 | 8 GB | 4 h | MaxBin2 (conda) |
+| DASTOOL | 16 | 24 GB | 1 h | DAS Tool 1.1.7 |
+| CHECKM2 | 16 | 32 GB | 1 h | CheckM2 1.0.1 |
+| GTDBTK | 4 | 256 GB | 4 h | GTDB-Tk 2.7.1 |
+| PROKKA | 8 | 24 GB | 6 h | Prokka 1.14.5 |
+| COVERM | 8 | 16 GB | 4 h | CoverM (conda) |
 
-⸻
+Update module names, environment paths, queues and resources in `conf/farm22.config` when the cluster installation changes.
 
-License
+## Repository layout
 
-A license will be added before the first stable release.
+```text
+main.nf                 Main DSL2 workflow
+nextflow.config         Parameters, default paths, profiles, workDir, trace settings
+conf/                   Farm22 and reference configuration
+modules/                Individual Nextflow processes
+subworkflows/           Composed workflow stages
+bin/                    Helper scripts made available to pipeline tasks
+scripts/                Housekeeping scripts (for example cleanup_batch.sh)
+utils/magflow_status.py Farm22 trace-based status dashboard
+submit_nextflow.sh      LSF launcher
+resume_nextflow.sh      LSF resume launcher
+```
 
-⸻
+## Author
 
-Author
-
-Hassan Afrad
-
-GitHub: https://github.com/afrad86
+Hassan Afrad — https://github.com/afrad86
