@@ -35,8 +35,15 @@ def main():
         writer = csv.DictWriter(dst, fieldnames=OUTPUT_FIELDS, delimiter='\t', lineterminator='\n')
         writer.writeheader()
         if header_at is None:
+            if any(line.strip() and not line.startswith('#') for line in lines):
+                raise SystemExit('normalize_eggnog.py: data rows but no #query header in %s' % a.input)
             return
         headers = lines[header_at].lstrip('#').rstrip('\r\n').split('\t')
+        missing = [c for c in ('COG_category', 'KEGG_ko', 'KEGG_Pathway', 'Description', 'Preferred_name')
+                   if c not in headers]
+        if missing:
+            raise SystemExit('normalize_eggnog.py: eggNOG columns not recognised: %s. Headers: %s'
+                             % (', '.join(missing), headers))
         reader = csv.DictReader(lines[header_at + 1:], fieldnames=headers, delimiter='\t')
         for row in reader:
             query = row.get('query_name') or row.get('query')

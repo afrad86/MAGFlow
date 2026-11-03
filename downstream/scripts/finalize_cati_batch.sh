@@ -11,6 +11,9 @@ results_dir="${CATI_DOWNSTREAM_RESULTS_DIR:-${MAGFLOW_RESULTS_DIR:-${CATI_ROOT}/
 batch_tables_dir="${results_dir}/18_summary/batches/${batch_id}"
 tables_dir="${CATI_DOWNSTREAM_TABLES_DIR:-${results_dir}/18_summary/cumulative}"
 
+# Stop before merging if a normalizer silently wrote blank key columns.
+python3 "${script_dir}/validate_tables.py" "${batch_tables_dir}"
+
 python3 "${script_dir}/merge_incremental_tables.py" \
   --previous-dir "${tables_dir}" \
   --batch-dir "${batch_tables_dir}" \

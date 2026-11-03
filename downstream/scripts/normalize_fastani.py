@@ -38,8 +38,13 @@ def main():
         if not os.path.exists(a.input):
             return
         with open(a.input, newline='') as src:
+            malformed = rows_seen = 0
             for row in csv.reader(src, delimiter='\t'):
+                if not row:
+                    continue
+                rows_seen += 1
                 if len(row) < 5:
+                    malformed += 1
                     continue
                 query = by_path.get(norm(row[0]))
                 reference = by_path.get(norm(row[1]))
@@ -60,6 +65,8 @@ def main():
                     'ani_percent': row[2], 'matching_fragments': matched, 'query_fragments': total,
                     'query_fragment_fraction': f'{matched / total:.6f}' if total else '',
                 })
+            if rows_seen and malformed == rows_seen:
+                raise SystemExit('normalize_fastani.py: every input row has fewer than 5 columns')
 
 
 if __name__ == '__main__':
