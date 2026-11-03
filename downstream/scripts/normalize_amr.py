@@ -16,6 +16,29 @@ def value(row, *names):
     return ''
 
 
+# Each logical field must be matched by at least one of these raw AMRFinderPlus headers.
+# AMRFinderPlus renames columns between major versions, so an unmatched field means the
+# normalizer is out of date and must fail loudly instead of writing empty columns.
+REQUIRED = {
+    'gene_symbol': ('Element symbol', 'Gene symbol'),
+    'element_type': ('Type', 'Element type'),
+    'class': ('Class',),
+    'method': ('Method',),
+    'identity_percent': ('% Identity to reference', '% Identity to reference sequence', '% Identity'),
+    'coverage_percent': ('% Coverage of reference', '% Coverage of reference sequence', '% Coverage'),
+    'accession': ('Closest reference accession', 'Accession of closest sequence', 'Accession'),
+}
+
+
+def check_headers(fieldnames):
+    present = {key(k) for k in fieldnames if k is not None}
+    missing = [f for f, names in REQUIRED.items() if not any(key(n) in present for n in names)]
+    if missing:
+        raise SystemExit('normalize_amr.py: AMRFinderPlus columns not recognised for %s. '
+                         'Raw headers: %s. Update REQUIRED/aliases for the installed AMRFinderPlus version.'
+                         % (', '.join(missing), list(fieldnames)))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--input', required=True)
@@ -33,7 +56,11 @@ def main():
         writer = csv.DictWriter(dst, fieldnames=fields, delimiter='\t', lineterminator='\n')
         writer.writeheader()
         reader = csv.DictReader(src, delimiter='\t')
+        if reader.fieldnames:
+            check_headers(reader.fieldnames)
         for row in reader:
+            if not value(row, 'Element symbol', 'Gene symbol'):
+                raise SystemExit('normalize_amr.py: hit without a gene symbol in %s' % a.input)
             writer.writerow({
                 'sample': a.sample, 'participant_id': a.participant, 'visit': a.visit, 'mag_id': a.mag,
                 'gene_symbol': value(row, 'Element symbol', 'Gene symbol'),

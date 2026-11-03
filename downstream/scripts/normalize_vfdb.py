@@ -16,9 +16,14 @@ def main():
         writer = csv.DictWriter(dst, fieldnames=fields, delimiter='\t', lineterminator='\n')
         writer.writeheader()
         with open(a.input, newline='', encoding='utf-8', errors='replace') as src:
+            seen = written = 0
             for row in csv.reader(src, delimiter='\t'):
+                if not row:
+                    continue
+                seen += 1
                 if len(row) < 9:
                     continue
+                written += 1
                 qlen = float(row[4]) if row[4] else 0.0
                 aligned = int(float(row[3])) if row[3] else 0
                 writer.writerow({
@@ -29,6 +34,8 @@ def main():
                     'query_coverage_percent': f'{100.0 * aligned / qlen:.4f}' if qlen else '',
                     'evalue': row[6], 'bitscore': row[7], 'subject_description': row[8],
                 })
+            if seen and not written:
+                raise SystemExit('normalize_vfdb.py: %d input rows but none have the expected 9 columns' % seen)
 
 
 if __name__ == '__main__':
